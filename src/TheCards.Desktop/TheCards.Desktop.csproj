@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Content/MainUI-Mural.png" LogicalName="MainUI-Mural.png" />
+    <EmbeddedResource Include="Content/MainUI-Menu.png" LogicalName="MainUI-Menu.png" />
     <EmbeddedResource Include="Content/MainUI-Title.png" LogicalName="MainUI-Title.png" />
     <EmbeddedResource Include="Content/MainUI-Theme.wav" LogicalName="MainUI-Theme.wav" />
   </ItemGroup>

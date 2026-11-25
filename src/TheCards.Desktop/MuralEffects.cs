@@ -4,9 +4,11 @@ using Microsoft.Xna.Framework.Graphics;
 namespace TheCards.Desktop;
 
 /// <summary>Draws animated light in the source mural's pixel coordinates.</summary>
-internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D artworkMask, Texture2D mural)
+internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D artworkMask, Texture2D mural,
+    RasterizerState muralRasterizer)
 {
     private static readonly Rectangle MaskArea = new(0, 0, 1532, 875);
+    private const int AtlasHeight = 1227;
     private static readonly (Rectangle Pane, float Interval, float Offset)[] Windows =
     [
         (new(683, 144, 7, 6), 11.2f, 3.1f),
@@ -54,6 +56,11 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
     private static readonly Rectangle VillainCape = new(1132, 443, 208, 199);
     private static readonly Rectangle WerewolfFur = new(385, 343, 206, 162);
 
+    // These effects overlap in mural coordinates. Store their masks in padded, separate slots.
+    private static readonly Point VampireCapeMaskOrigin = new(1, 876);
+    private static readonly Point HeroCapeMaskOrigin = new(245, 876);
+    private static readonly Point WerewolfFurMaskOrigin = new(385, 876);
+
     private static readonly (Rectangle Region, float Angle, float Offset)[] RuinsFog =
     [
         (new(410, 708, 178, 62), -0.24f, 0.12f),
@@ -86,7 +93,7 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
         var area = MaskArea;
         var source = new Color[area.Width * area.Height];
         mural.GetData(0, area, source, 0, source.Length);
-        var mask = new Color[source.Length];
+        var mask = new Color[area.Width * AtlasHeight];
         foreach (var (pane, _, _) in Windows)
         {
             MaskPixels(pane, source, mask, pixel =>
@@ -134,12 +141,12 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
             [new(785, 270), new(830, 293), new(836, 396), new(829, 480),
              new(787, 520), new(699, 544), new(632, 618), new(607, 568),
              new(615, 483), new(732, 429), new(753, 386), new(730, 342)],
-            RedCloth, anchorX: 790, anchorY: 322);
+            RedCloth, anchorX: 790, anchorY: 322, maskOrigin: VampireCapeMaskOrigin);
         MaskCape(HeroCape, source, mask,
             [new(949, 310), new(962, 326), new(945, 354), new(920, 368),
              new(899, 397), new(878, 403), new(859, 421), new(827, 421),
              new(846, 377), new(869, 366), new(903, 345)],
-            GoldCloth, anchorX: 955, anchorY: 326);
+            GoldCloth, anchorX: 955, anchorY: 326, maskOrigin: HeroCapeMaskOrigin);
         MaskCape(KnightUpperCape, source, mask,
             [new(0, 535), new(47, 539), new(94, 513), new(141, 503),
              new(103, 541), new(75, 605), new(0, 664)],
@@ -172,7 +179,7 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
              new(517, 402), new(496, 418), new(477, 416), new(449, 433),
              new(428, 447), new(410, 474), new(386, 504), new(394, 466)],
             pixel => MathHelper.Clamp((pixel.B - pixel.R + 13) / 36f, 0f, 1f),
-            anchorX: 527, anchorY: 412);
+            anchorX: 527, anchorY: 412, maskOrigin: WerewolfFurMaskOrigin);
 
         foreach (var (region, angle, _) in RuinsFog)
         {
@@ -207,7 +214,7 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
             }
         }
 
-        var texture = new Texture2D(mural.GraphicsDevice, area.Width, area.Height);
+        var texture = new Texture2D(mural.GraphicsDevice, area.Width, AtlasHeight);
         texture.SetData(mask);
         return texture;
     }
@@ -251,8 +258,9 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
     }
 
     private static void MaskCape(Rectangle region, Color[] source, Color[] mask, Point[] outline,
-        Func<Color, float> coverage, int anchorX, int anchorY)
+        Func<Color, float> coverage, int anchorX, int anchorY, Point? maskOrigin = null)
     {
+        var origin = maskOrigin ?? region.Location;
         for (var y = region.Top; y < region.Bottom; y++)
         {
             for (var x = region.Left; x < region.Right; x++)
@@ -266,7 +274,8 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
                 var pixel = source[index];
                 var distance = Vector2.Distance(new Vector2(x, y), new Vector2(anchorX, anchorY));
                 var anchored = MathHelper.Clamp((distance - 8f) / 46f, 0f, 1f);
-                mask[index] = pixel * (coverage(pixel) * anchored);
+                var maskIndex = (origin.Y + y - region.Y) * MaskArea.Width + origin.X + x - region.X;
+                mask[maskIndex] = pixel * (coverage(pixel) * anchored);
             }
         }
     }
@@ -321,7 +330,7 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
         DrawMaskedArtwork(time, muralTransform);
 
         batch.Begin(blendState: BlendState.Additive, samplerState: SamplerState.LinearClamp,
-            transformMatrix: muralTransform);
+            rasterizerState: muralRasterizer, transformMatrix: muralTransform);
 
         DrawClouds(time);
         DrawLightning(time, BackpackLeftArc, 1.53f, 0.18f);
@@ -368,19 +377,19 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
 
     private void DrawMaskedArtwork(float time, Matrix muralTransform)
     {
-        batch.Begin(samplerState: SamplerState.LinearClamp, transformMatrix: muralTransform);
+        batch.Begin(samplerState: SamplerState.LinearClamp, rasterizerState: muralRasterizer, transformMatrix: muralTransform);
         DrawDriftingMist(RuinsFog, time, 8.5f, 103f, 0.96f);
         DrawDriftingMist(MoonClouds, time, 9.5f, 108f, 1f);
         DrawGalaxy(time);
         DrawBanner(time);
         DrawDragonFire(time);
-        DrawCape(VampireCape, time, 1.9f, 0.1f, 10f);
-        DrawCape(HeroCape, time, 3.5f, 1.8f, 8f);
+        DrawCape(VampireCape, time, 1.9f, 0.1f, 10f, VampireCapeMaskOrigin);
+        DrawCape(HeroCape, time, 3.5f, 1.8f, 8f, HeroCapeMaskOrigin);
         DrawCape(KnightUpperCape, time, 2.4f, 2.4f, 8f);
         DrawCape(KnightLowerCape, time, 2.2f, 4.1f, 10f);
         DrawCape(WizardRobe, time, 2.0f, 3.5f, 7.5f);
         DrawCape(VillainCape, time, 2.6f, 1.1f, 11f);
-        DrawCape(WerewolfFur, time, 3.4f, 2.1f, 6f);
+        DrawCape(WerewolfFur, time, 3.4f, 2.1f, 6f, WerewolfFurMaskOrigin);
 
         foreach (var (pane, interval, offset) in Windows)
         {
@@ -488,8 +497,10 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
             1.03f, SpriteEffects.None, 0f);
     }
 
-    private void DrawCape(Rectangle region, float time, float rate, float offset, float amplitude)
+    private void DrawCape(Rectangle region, float time, float rate, float offset, float amplitude,
+        Point? maskOrigin = null)
     {
+        var origin = maskOrigin ?? region.Location;
         var cycle = time * rate + offset;
         var rowTop = (float)region.Top;
         for (var y = region.Top; y < region.Bottom; y++)
@@ -504,7 +515,7 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
             var lift = amplitude * 0.38f * MathF.Sin(cycle - nextDistance * 7f)
                 * MathF.Sin(nextDistance * MathF.PI);
             var rowBottom = y + 1 + lift;
-            var source = new Rectangle(region.X - MaskArea.X, y - MaskArea.Y, region.Width, 1);
+            var source = new Rectangle(origin.X, origin.Y + y - region.Y, region.Width, 1);
             var x = region.X == 0 ? shift * 0.5f + amplitude * 0.5f : region.X + shift;
             batch.Draw(artworkMask, new Vector2(x, rowTop), source,
                 new Color(brightness, brightness, brightness) * 0.87f, 0f, Vector2.Zero,

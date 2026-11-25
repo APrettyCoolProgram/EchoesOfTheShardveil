@@ -11,8 +11,10 @@ internal sealed class CardGame : Game
     private SpriteBatch? spriteBatch;
     private Texture2D? mural;
     private Texture2D? title;
+    private Texture2D? menu;
     private Texture2D? glow;
     private Texture2D? artworkMask;
+    private RasterizerState? muralRasterizer;
     private SoundEffect? soundtrack;
     private SoundEffectInstance? music;
     private MainUI? mainUI;
@@ -37,11 +39,14 @@ internal sealed class CardGame : Game
         mural = Texture2D.FromStream(GraphicsDevice, stream);
         using var titleStream = OpenEmbeddedAsset("MainUI-Title.png");
         title = Texture2D.FromStream(GraphicsDevice, titleStream, DefaultColorProcessors.PremultiplyAlpha);
+        using var menuStream = OpenEmbeddedAsset("MainUI-Menu.png");
+        menu = Texture2D.FromStream(GraphicsDevice, menuStream, DefaultColorProcessors.PremultiplyAlpha);
         spriteBatch = new SpriteBatch(GraphicsDevice);
         glow = MuralEffects.CreateGlow(GraphicsDevice);
         artworkMask = MuralEffects.CreateArtworkMask(mural);
-        mainUI = new MainUI(GraphicsDevice, spriteBatch, mural, title,
-            new MuralEffects(spriteBatch, glow, artworkMask, mural));
+        muralRasterizer = new RasterizerState { ScissorTestEnable = true };
+        mainUI = new MainUI(GraphicsDevice, spriteBatch, mural, title, menu,
+            new MuralEffects(spriteBatch, glow, artworkMask, mural, muralRasterizer));
 
         try
         {
@@ -69,8 +74,10 @@ internal sealed class CardGame : Game
             music?.Dispose();
             soundtrack?.Dispose();
             spriteBatch?.Dispose();
+            muralRasterizer?.Dispose();
             artworkMask?.Dispose();
             glow?.Dispose();
+            menu?.Dispose();
             title?.Dispose();
             mural?.Dispose();
         }
