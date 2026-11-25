@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="TheCards.Core/TheCards.Core.csproj" />
+  <Project Path="TheCards.Desktop/TheCards.Desktop.csproj" />
+</Solution>
