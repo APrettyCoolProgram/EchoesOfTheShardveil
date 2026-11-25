@@ -10,6 +10,7 @@ internal sealed class CardGame : Game
     private readonly GraphicsDeviceManager graphics;
     private SpriteBatch? spriteBatch;
     private Texture2D? mural;
+    private Texture2D? title;
     private Texture2D? glow;
     private Texture2D? artworkMask;
     private SoundEffect? soundtrack;
@@ -34,10 +35,12 @@ internal sealed class CardGame : Game
     {
         using var stream = OpenEmbeddedAsset("MainUI-Mural.png");
         mural = Texture2D.FromStream(GraphicsDevice, stream);
+        using var titleStream = OpenEmbeddedAsset("MainUI-Title.png");
+        title = Texture2D.FromStream(GraphicsDevice, titleStream, DefaultColorProcessors.PremultiplyAlpha);
         spriteBatch = new SpriteBatch(GraphicsDevice);
         glow = MuralEffects.CreateGlow(GraphicsDevice);
         artworkMask = MuralEffects.CreateArtworkMask(mural);
-        mainUI = new MainUI(GraphicsDevice, spriteBatch, mural,
+        mainUI = new MainUI(GraphicsDevice, spriteBatch, mural, title,
             new MuralEffects(spriteBatch, glow, artworkMask, mural));
 
         try
@@ -68,6 +71,7 @@ internal sealed class CardGame : Game
             spriteBatch?.Dispose();
             artworkMask?.Dispose();
             glow?.Dispose();
+            title?.Dispose();
             mural?.Dispose();
         }
 
