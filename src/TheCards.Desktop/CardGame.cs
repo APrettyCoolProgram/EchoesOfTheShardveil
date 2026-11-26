@@ -1,104 +1,114 @@
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
 
 namespace TheCards.Desktop;
 
+/// <summary>The single MonoGame game. It owns the window and shared resources and switches between screens.</summary>
 internal sealed class CardGame : Game
 {
     private readonly GraphicsDeviceManager graphics;
-    private SpriteBatch? spriteBatch;
-    private Texture2D? mural;
-    private Texture2D? title;
-    private Texture2D? menu;
-    private Texture2D? glow;
-    private Texture2D? artworkMask;
-    private RasterizerState? muralRasterizer;
-    private SoundEffect? soundtrack;
-    private SoundEffectInstance? music;
-    private MainUI? mainUI;
+    private readonly GameAudio audio = new();
+    private SpriteBatch? batch;
+    private Texture2D? pixel;
+    private Texture2D? font;
+    private DesktopDrawable? drawable;
+    private MenuScreen? menu;
+    private BoardScreen? board;
+    private bool exitConfirmed;
 
     public CardGame()
     {
         graphics = new GraphicsDeviceManager(this)
         {
-            PreferredBackBufferWidth = 1280,
-            PreferredBackBufferHeight = 720
+            PreferredBackBufferWidth = BoardUI.Width,
+            PreferredBackBufferHeight = BoardUI.Height,
+            HardwareModeSwitch = false,
         };
-
-        Content.RootDirectory = "Content";
-        Window.Title = "The Cards";
         Window.AllowUserResizing = true;
         IsMouseVisible = true;
     }
 
+    private IScreen? Current => (IScreen?)board ?? menu;
+
+    internal static Stream OpenEmbeddedAsset(string name) =>
+        typeof(CardGame).Assembly.GetManifestResourceStream(name)
+        ?? throw new InvalidOperationException($"Missing embedded game asset '{name}'.");
+
     protected override void LoadContent()
     {
-        using var stream = OpenEmbeddedAsset("MainUI-Mural.png");
-        mural = Texture2D.FromStream(GraphicsDevice, stream);
-        using var titleStream = OpenEmbeddedAsset("MainUI-Title.png");
-        title = Texture2D.FromStream(GraphicsDevice, titleStream, DefaultColorProcessors.PremultiplyAlpha);
-        using var menuStream = OpenEmbeddedAsset("MainUI-Menu.png");
-        menu = Texture2D.FromStream(GraphicsDevice, menuStream, DefaultColorProcessors.PremultiplyAlpha);
-        spriteBatch = new SpriteBatch(GraphicsDevice);
-        glow = MuralEffects.CreateGlow(GraphicsDevice);
-        artworkMask = MuralEffects.CreateArtworkMask(mural);
-        muralRasterizer = new RasterizerState { ScissorTestEnable = true };
-        mainUI = new MainUI(GraphicsDevice, spriteBatch, mural, title, menu,
-            new MuralEffects(spriteBatch, glow, artworkMask, mural, muralRasterizer));
-
-        try
+        batch = new SpriteBatch(GraphicsDevice);
+        pixel = new Texture2D(GraphicsDevice, 1, 1);
+        pixel.SetData([Color.White]);
+        using (var stream = OpenEmbeddedAsset("Board-Font.png"))
         {
-            using var musicStream = OpenEmbeddedAsset("MainUI-Theme.wav");
-            soundtrack = SoundEffect.FromStream(musicStream);
-            music = soundtrack.CreateInstance();
-            music.IsLooped = true;
-            music.Volume = 0.35f;
-            music.Play();
+            font = Texture2D.FromStream(GraphicsDevice, stream, DefaultColorProcessors.PremultiplyAlpha);
         }
-        catch (NoAudioHardwareException)
+        drawable = new DesktopDrawable();
+        menu = new MenuScreen(new GameServices(GraphicsDevice, batch, pixel, font, audio));
+        Window.Title = menu.Title;
+        audio.Start();
+    }
+
+    protected override void Update(GameTime gameTime)
+    {
+        if (Current is { } screen)
         {
-            // The startup screen can still run without an audio device.
+            var client = drawable?.Synchronize(GraphicsDevice, Window) ?? Window.ClientBounds;
+            Apply(screen.Update(gameTime, client, IsActive));
+        }
+        base.Update(gameTime);
+    }
+
+    private void Apply(ScreenTransition transition)
+    {
+        switch (transition)
+        {
+            case ScreenTransition.OpenBoard when batch is not null && pixel is not null && font is not null:
+                board = new BoardScreen(new GameServices(GraphicsDevice, batch, pixel, font, audio));
+                Window.Title = board.Title;
+                break;
+            case ScreenTransition.ReturnToMenu when board is not null && menu is not null:
+                board.Dispose();
+                board = null;
+                menu.Activate();
+                Window.Title = menu.Title;
+                break;
+            case ScreenTransition.ExitGame:
+                exitConfirmed = true;
+                Exit();
+                break;
         }
     }
 
-    private static Stream OpenEmbeddedAsset(string name) =>
-        typeof(CardGame).Assembly.GetManifestResourceStream(name)
-        ?? throw new InvalidOperationException($"Missing embedded game asset '{name}'.");
+    protected override void OnExiting(object sender, ExitingEventArgs args)
+    {
+        base.OnExiting(sender, args);
+        // The window's close button asks first: the menu offers to quit, the board offers to forfeit.
+        if (!exitConfirmed && Current is { } screen)
+        {
+            args.Cancel = true;
+            screen.RequestClose();
+        }
+    }
+
+    protected override void Draw(GameTime gameTime)
+    {
+        Current?.Draw(gameTime);
+        base.Draw(gameTime);
+    }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
-            music?.Dispose();
-            soundtrack?.Dispose();
-            spriteBatch?.Dispose();
-            muralRasterizer?.Dispose();
-            artworkMask?.Dispose();
-            glow?.Dispose();
+            board?.Dispose();
             menu?.Dispose();
-            title?.Dispose();
-            mural?.Dispose();
+            audio.Dispose();
+            font?.Dispose();
+            pixel?.Dispose();
+            batch?.Dispose();
+            drawable?.Dispose();
         }
-
         base.Dispose(disposing);
-    }
-
-    protected override void Update(GameTime gameTime)
-    {
-        if (Keyboard.GetState().IsKeyDown(Keys.Escape))
-        {
-            Exit();
-        }
-
-        base.Update(gameTime);
-    }
-
-    protected override void Draw(GameTime gameTime)
-    {
-        GraphicsDevice.Clear(Color.Black);
-        mainUI?.Draw(gameTime);
-        base.Draw(gameTime);
     }
 }

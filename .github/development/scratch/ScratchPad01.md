@@ -13,3 +13,8 @@ dotnet clean && dotnet build TheCards.slnx && dotnet test && dotnet run --projec
 ```
 dotnet clean && dotnet build TheCards.slnx && dotnet test && dotnet publish TheCards.Desktop/TheCards.Desktop.csproj -c Release -r osx-arm64 --self-contained
 ```
+
+alpha.02
+```
+/Users/csb/Repositories/APCP/TheCards/src/TheCards.Desktop/bin/Release/net11.0/osx-arm64/publish/TheCards.Desktop --alpha-duel
+```
