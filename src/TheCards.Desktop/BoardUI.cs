@@ -70,6 +70,9 @@ internal sealed class BoardUI
     private readonly Texture2D pixel;
     private readonly Texture2D font;
     private readonly Texture2D heroPortrait;
+    private readonly Texture2D opponentPortrait;
+    private readonly Texture2D heroPlaymat;
+    private readonly Texture2D opponentPlaymat;
     private readonly Texture2D heroHealth;
     private readonly Texture2D heroDropRing;
     private readonly Texture2D badgeBlank;
@@ -98,12 +101,15 @@ internal sealed class BoardUI
 
     public BoardUI(SpriteBatch batch, Texture2D pixel, Texture2D font,
         Texture2D heroPortrait, Texture2D heroHealth, Texture2D heroDropRing, Texture2D badgeBlank,
-        Texture2D counterDigitSheet)
+        Texture2D counterDigitSheet, Texture2D heroPlaymat, Texture2D opponentPortrait, Texture2D opponentPlaymat)
     {
         this.batch = batch;
         this.pixel = pixel;
         this.font = font;
         this.heroPortrait = heroPortrait;
+        this.opponentPortrait = opponentPortrait;
+        this.heroPlaymat = heroPlaymat;
+        this.opponentPlaymat = opponentPlaymat;
         this.heroHealth = heroHealth;
         this.heroDropRing = heroDropRing;
         this.badgeBlank = badgeBlank;
@@ -570,7 +576,7 @@ internal sealed class BoardUI
         {
             duel.Attack(Human, attacker, new(Opponent, enemySlot));
         }
-        else if (OpponentLeaderBounds().Contains(position))
+        else if (InPortrait(PortraitBounds(Opponent), position))
         {
             duel.Attack(Human, attacker);
         }
@@ -677,15 +683,16 @@ internal sealed class BoardUI
         ? 352 + ExtraHeight * 3 / 4
         : 122 + ExtraHeight / 4;
 
-    private Rectangle OpponentLeaderBounds() => CardBounds(28, SideTop(Opponent), 80);
     // The portrait sits in the lower-left corner, low enough that its Health badge stays inside the window.
     private Rectangle HeroPortraitBounds() => new(PortraitLeft, layoutHeight - HeroPortraitSize - HeroHealthSize / 2 - 10,
         HeroPortraitSize, HeroPortraitSize);
 
+    private Rectangle PortraitBounds(int player) => player == Human ? HeroPortraitBounds()
+        : new(PortraitLeft, HeroHealthSize / 2 + 10, HeroPortraitSize, HeroPortraitSize);
+
     /// <summary>Returns a badge centered on the portrait's rim at a clock position (12 is the top).</summary>
-    private Rectangle RimBadge(float hour)
+    private static Rectangle RimBadge(Rectangle portrait, float hour)
     {
-        var portrait = HeroPortraitBounds();
         var angle = hour / 12f * MathHelper.TwoPi;
         var radius = HeroPortraitSize / 2f;
         var x = portrait.Center.X + (int)MathF.Round(radius * MathF.Sin(angle));
@@ -693,29 +700,28 @@ internal sealed class BoardUI
         return new(x - HeroHealthSize / 2, y - HeroHealthSize / 2, HeroHealthSize, HeroHealthSize);
     }
 
-    private Rectangle HeroHealthBounds() => RimBadge(6);
-    private Rectangle HeroWellBounds() => RimBadge(12);
+    private (Rectangle Bounds, int Value, string Tooltip)[] PortraitBadges(int player, PlayerView view)
+    {
+        var portrait = PortraitBounds(player);
+        return
+        [
+            (RimBadge(portrait, 12), view.Shards, player == Human ? WellTooltip :
+                "WELL|Shards in the Opponent's Well. Each ready shard pays for 1 energy."),
+            (RimBadge(portrait, 6), view.Health, player == Human ? HealthTooltip :
+                "OPPONENT|Their remaining Health. Attack this portrait to reduce it."),
+        ];
+    }
 
-    // Removed lines up with the top of the portrait and Discard with its bottom.
-    private Rectangle RemovedCounterBounds() => new(CounterEdge, HeroPortraitBounds().Top, CounterWidth, CounterHeight);
-    private Rectangle DiscardCounterBounds() => new(CounterEdge, HeroPortraitBounds().Bottom - CounterHeight, CounterWidth, CounterHeight);
-    // Deck mirrors Discard on the other side of the portrait.
-    private Rectangle DeckCounterBounds() => new(DeckCounterLeft, DiscardCounterBounds().Y, CounterWidth, CounterHeight);
-
-    /// <summary>The round badges on the Hero portrait, with their hover text.</summary>
-    private (Rectangle Bounds, int Value, string Tooltip)[] HeroBadges() =>
-    [
-        (HeroWellBounds(), own.Shards, WellTooltip),
-        (HeroHealthBounds(), own.Health, HealthTooltip),
-    ];
-
-    /// <summary>The card-shaped counters beside the portrait, with their hover text.</summary>
-    private (Rectangle Bounds, int Value, string Tooltip)[] CardCounters() =>
-    [
-        (RemovedCounterBounds(), 0, RemovedTooltip), // The duel has no removed zone yet.
-        (DiscardCounterBounds(), own.Discard.Count, DiscardTooltip),
-        (DeckCounterBounds(), own.DeckCount, DeckTooltip),
-    ];
+    private static (Rectangle Bounds, int Value, string Tooltip)[] CardCounters(Rectangle portrait, PlayerView view)
+    {
+        var bottom = portrait.Bottom - CounterHeight;
+        return
+        [
+            (new(CounterEdge, portrait.Top, CounterWidth, CounterHeight), 0, RemovedTooltip),
+            (new(CounterEdge, bottom, CounterWidth, CounterHeight), view.Discard.Count, DiscardTooltip),
+            (new(DeckCounterLeft, bottom, CounterWidth, CounterHeight), view.DeckCount, DeckTooltip),
+        ];
+    }
 
     private static bool InBadge(Rectangle badge, Point position)
     {
@@ -739,12 +745,14 @@ internal sealed class BoardUI
         }
     }
 
-    private bool IsOverHeroPortrait(Point position)
+    private bool IsOverHeroPortrait(Point position) => InPortrait(HeroPortraitBounds(), position);
+
+    private static bool InPortrait(Rectangle bounds, Point position)
     {
-        var delta = position - HeroPortraitBounds().Center;
+        var delta = position - bounds.Center;
         return delta.X * delta.X + delta.Y * delta.Y <= HeroPortraitSize * HeroPortraitSize / 4;
     }
-    private Rectangle OpponentWellBounds() => CardBounds(117, SideTop(Opponent), 55);
+
     private Rectangle UnitBounds(int player, int slot) => CardBounds(265 + slot * 150, SideTop(player));
     private Rectangle RelicBounds(int player, int slot) => CardBounds(1008 + slot * 131, SideTop(player));
 
@@ -769,13 +777,12 @@ internal sealed class BoardUI
         batch.Begin(samplerState: SamplerState.LinearClamp, rasterizerState: rasterizer,
             transformMatrix: view.Transform);
         Fill(AcrossWindow(0, layoutHeight), BackgroundColor);
-        Fill(AcrossWindow(layoutHeight - 164, 164), new Color(16, 28, 35));
-        Fill(AcrossWindow(layoutHeight - 165, 1), Border);
-        RoundedFill(new(230, SideTop(Opponent) - 19, 1022, 166), new Color(19, 32, 39));
-        RoundedFill(new(230, SideTop(Human) - 19, 1022, 166), new Color(19, 32, 39));
+        var split = layoutHeight / 2 - 22;
+        DrawPlaymat(opponentPlaymat, AcrossWindow(0, split), verticalAnchor: 0.5f);
+        DrawPlaymat(heroPlaymat, AcrossWindow(split, layoutHeight - split), verticalAnchor: 1f);
         DrawSide(Opponent, enemy);
         DrawSide(Human, own);
-        DrawCenter();
+        DrawStatus();
         DrawHand();
         DrawActions();
         DrawDrag();
@@ -794,64 +801,46 @@ internal sealed class BoardUI
         batch.End();
     }
 
+    private void DrawPlaymat(Texture2D texture, Rectangle bounds, float verticalAnchor)
+    {
+        var scale = Math.Max((float)bounds.Width / texture.Width, (float)bounds.Height / texture.Height);
+        var width = Math.Clamp((int)MathF.Round(bounds.Width / scale), 1, texture.Width);
+        var height = Math.Clamp((int)MathF.Round(bounds.Height / scale), 1, texture.Height);
+        var source = new Rectangle((texture.Width - width) / 2,
+            (int)MathF.Round((texture.Height - height) * verticalAnchor), width, height);
+        batch.Draw(texture, bounds, source, Color.White);
+    }
+
     private void DrawSide(int player, PlayerView view)
     {
-        var top = SideTop(player);
-        var accent = player == Human ? Teal : Rose;
+        var portrait = PortraitBounds(player);
         var attackTarget = player == Opponent && selectedAttacker is not null;
-        var health = view.Health.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        var shards = view.Shards.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        int statsX;
-        if (player == Human)
+        batch.Draw(player == Human ? heroPortrait : opponentPortrait, portrait, Color.White);
+        if (attackTarget || (player == Human && own.CanFeedWell && handDrag is { Started: true, Position: not null }))
         {
-            var portrait = HeroPortraitBounds();
-            batch.Draw(heroPortrait, portrait, Color.White);
-            if (own.CanFeedWell && handDrag is { Started: true, Position: { } pointer })
-            {
-                var dropRing = portrait;
-                dropRing.Inflate(3, 3);
-                batch.Draw(heroDropRing, dropRing, IsOverHeroPortrait(pointer) ? Gold : Teal);
-            }
-
-            foreach (var (bounds, value, _) in HeroBadges())
-            {
-                DrawBadge(bounds, value);
-            }
-            foreach (var (bounds, value, _) in CardCounters())
-            {
-                DrawCardCounter(bounds, value);
-            }
-            statsX = 28;
-            Text($"{view.ReadyShards} READY", statsX, top + 20, 12, Teal);
-        }
-        else
-        {
-            var leader = OpponentLeaderBounds();
-            Box(leader, Panel, attackTarget ? Gold : Border);
-            CenterText("LEADER", leader.Center.X, leader.Y + 12, 15, accent);
-            CenterText(health, leader.Center.X, leader.Y + 35, 37, Ivory);
-            CenterText($"/ {Duel.StartingHealth}", leader.Center.X, leader.Y + 78, 15, Muted);
-
-            var well = OpponentWellBounds();
-            DashedSlot(well);
-            CenterText("WELL", well.Center.X, well.Y + 8, 13, accent);
-            CenterText(shards, well.Center.X, well.Y + 22, 27, Ivory);
-            CenterText($"{view.ReadyShards} READY", well.Center.X, well.Y + 54, 11, Muted);
-            statsX = well.Right + 10;
-            Text("OPPONENT", statsX, top + 3, 16, accent);
+            var ring = portrait;
+            ring.Inflate(3, 3);
+            var hovered = handDrag?.Position is { } pointer && InPortrait(portrait, pointer);
+            batch.Draw(heroDropRing, ring, attackTarget || hovered ? Gold : Teal);
         }
 
-        var statSize = player == Human ? 12 : 14;
-        Text($"DECK {view.DeckCount}", statsX, top + 36, statSize, Muted);
-        Text($"HAND {view.HandCount}", statsX, top + 52, statSize, Muted);
-        Text($"DISCARD {view.Discard.Count}", statsX, top + 68, statSize, Muted);
+        foreach (var (bounds, value, _) in PortraitBadges(player, view))
+        {
+            DrawBadge(bounds, value);
+        }
+        foreach (var (bounds, value, _) in CardCounters(portrait, view))
+        {
+            DrawCardCounter(bounds, value);
+        }
+
+        var statusY = player == Human ? SideTop(player) + 86 : portrait.Bottom + 24;
         if (view.HasSpark)
         {
-            Text("SPARK READY", statsX, top + 86, statSize, Gold);
+            Text("SPARK READY", 28, statusY, 12, Gold);
         }
         if (view.TemporaryEnergy > 0)
         {
-            Text($"+{view.TemporaryEnergy} ENERGY", statsX, top + 104, statSize, Gold);
+            Text($"+{view.TemporaryEnergy} ENERGY", 28, statusY + 18, 12, Gold);
         }
 
         for (var i = 0; i < Duel.UnitSlots; i++)
@@ -911,14 +900,19 @@ internal sealed class BoardUI
             return;
         }
 
-        var hovered = HeroBadges().Where(badge => InBadge(badge.Bounds, pointer))
-            .Concat(CardCounters().Where(counter => counter.Bounds.Contains(pointer))).ToArray();
+        var player = pointer.Y < layoutHeight / 2 ? Opponent : Human;
+        var view = player == Human ? own : enemy;
+        var portrait = PortraitBounds(player);
+        var counters = CardCounters(portrait, view);
+        var hovered = PortraitBadges(player, view).Where(badge => InBadge(badge.Bounds, pointer))
+            .Concat(counters.Where(counter => counter.Bounds.Contains(pointer))).ToArray();
         if (hovered.Length == 0)
         {
             return;
         }
 
         var (badge, _, tooltip) = hovered[0];
+        var deck = counters[2].Bounds;
 
         var separator = tooltip.IndexOf('|');
         var heading = tooltip[..separator];
@@ -929,11 +923,11 @@ internal sealed class BoardUI
         var height = 2 * padding + 20 + lines.Length * (bodySize + 4);
         // Show it beside the portrait, level with the badge, so it never covers the portrait.
         var y = Math.Clamp(badge.Center.Y - height / 2, 8, layoutHeight - height - 8);
-        var bounds = new Rectangle(Math.Max(badge.Right, HeroPortraitBounds().Right) + 10, y, width, height);
-        if (bounds.Intersects(DeckCounterBounds()) && badge != DeckCounterBounds())
+        var bounds = new Rectangle(Math.Max(badge.Right, portrait.Right) + 10, y, width, height);
+        if (bounds.Intersects(deck) && badge != deck)
         {
             // Keep the tooltip from covering the Deck counter.
-            bounds.X = DeckCounterBounds().Right + 10;
+            bounds.X = deck.Right + 10;
         }
         Box(bounds, new Color(19, 34, 43), new Color(73, 110, 120));
         Text(heading, bounds.X + padding, bounds.Y + padding, 15, Teal);
@@ -1023,64 +1017,25 @@ internal sealed class BoardUI
                 Fill(new(x, y + 23, 11, 16), slot < Duel.UnitSlots ? Border : Gold * 0.65f);
             }
         }
-        Fill(new(left + 10, top + 92, width - 20, 16), Panel);
-        CenterText("PROMPT", left + width / 2, top + 92, 14, Ivory);
         CenterText("ACTIONS", left + width / 2, top + 159, 14, Muted);
         CenterText("YOUR HAND", left + width / 2, top + 177, 14, Teal);
     }
 
-    private void DrawCenter()
+    private void DrawStatus()
     {
-        var bounds = new Rectangle(28, 271 + ExtraHeight / 2, 1224, 70);
-        Box(bounds, new Color(24, 39, 44), Border);
-        CenterText(Instruction(), bounds.Center.X, bounds.Y + 10, 22, Ivory);
-        var detail = message;
-        if (detail.Length == 0 && selectedHand is int selected)
+        var status = duel.Outcome switch
         {
-            detail = CardHint(own.Hand![selected]);
-        }
-        if (detail.Length > 0)
-        {
-            CenterText(detail, bounds.Center.X, bounds.Y + 42, 16, Muted);
-        }
-    }
-
-    private string Instruction()
-    {
-        if (duel.Outcome != DuelOutcome.Ongoing)
-        {
-            return duel.Outcome switch
-            {
-                DuelOutcome.PlayerOneWins => "You win.",
-                DuelOutcome.PlayerTwoWins => "Opponent wins.",
-                _ => "The duel is a draw.",
-            };
-        }
-
-        if (duel.PendingAttack is { } attack)
-        {
-            if (duel.ActivePlayer == Human)
-            {
-                return "Opponent is deciding whether to intercept.";
-            }
-            var target = attack.Target is { } unit ? own.Units[unit.Slot]!.Card.Name : "your Hero";
-            return $"Attack on {target}. Choose an eligible unit or take the hit.";
-        }
-        if (duel.Phase != DuelPhase.Mulligan && duel.ActivePlayer == Opponent)
-        {
-            return "Opponent's turn";
-        }
-        return duel.Phase switch
-        {
-            DuelPhase.Mulligan => "Choose any opening cards to replace, then confirm.",
-            DuelPhase.Main when handDrag is { Started: true, Plays.Count: 0 } && !own.CanFeedWell => "No legal destination for this card.",
-            DuelPhase.Main when handDrag is { Started: true } => "Drop the card on a highlighted space.",
-            DuelPhase.Main => "Drag a card to a slot to play it, or onto your portrait to feed the Well.",
-            DuelPhase.Battle when selectedAttacker is not null => "Choose an enemy unit or click the opponent's Leader.",
-            DuelPhase.Battle => "Choose a unit marked ATTACK, or end the battle.",
-            DuelPhase.End when own.HandCount > Duel.HandLimit => "Select cards to discard until your hand has 10 cards.",
-            _ => "End your turn when ready.",
+            DuelOutcome.PlayerOneWins => "You win.",
+            DuelOutcome.PlayerTwoWins => "Opponent wins.",
+            DuelOutcome.Draw => "The duel is a draw.",
+            _ when duel.PendingAttack is { } attack && duel.ActivePlayer == Opponent =>
+                $"Attack on {(attack.Target is { } unit ? own.Units[unit.Slot]!.Card.Name : "your Hero")}.",
+            _ => message,
         };
+        if (status.Length > 0)
+        {
+            CenterText(status, Width / 2, layoutHeight - 172, 16, Ivory);
+        }
     }
 
     private void DrawHand()
@@ -1279,27 +1234,6 @@ internal sealed class BoardUI
             Text(label, bounds.Right - inset - TextAdvance(labelSize) * label.Length,
                 bounds.Bottom - labelSize - 6, labelSize, ready ? Teal : Muted);
         }
-    }
-
-    private static string CardHint(CardDefinition card)
-    {
-        var rule = card.Keywords switch
-        {
-            CardKeyword.Rush => "Can attack on the turn it enters play.",
-            CardKeyword.Vigilant => "Stays ready after attacking.",
-            CardKeyword.Sentinel => "Can intercept while exhausted.",
-            CardKeyword.Elusive => "Only Elusive units can intercept its attacks.",
-            CardKeyword.Pierce => "Excess combat damage hits the enemy Leader.",
-            CardKeyword.Drain => "Damage dealt restores that much Health to your Hero.",
-            _ => card.Id switch
-            {
-                "spark-bolt" => "Deal 3 damage to a unit.",
-                "second-wind" => "Ready one of your units, then draw a card.",
-                "beacon-of-tides" => "At the start of your turn, give a random friendly unit +1 Power.",
-                _ => card.Abilities.Count > 0 ? Describe(card.Abilities[0]) : "",
-            },
-        };
-        return rule.Length == 0 ? card.Name : $"{card.Name}: {rule}";
     }
 
     private static string Describe(CardAbility ability) => ability.Action switch

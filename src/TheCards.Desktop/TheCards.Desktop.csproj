@@ -11,7 +11,10 @@
   <ItemGroup>
     <EmbeddedResource Include="Content/TheCards.bmp" LogicalName="Icon.bmp" />
     <EmbeddedResource Include="Content/Board-Hero-Health.png" LogicalName="Board-Hero-Health.png" />
+    <EmbeddedResource Include="Content/Board-Hero-Knight-Playmat.jpg" LogicalName="Board-Hero-Knight-Playmat.jpg" />
     <EmbeddedResource Include="Content/Board-Hero-Knight.png" LogicalName="Board-Hero-Knight.png" />
+    <EmbeddedResource Include="Content/Board-Opponent-Lich-King.png" LogicalName="Board-Opponent-Lich-King.png" />
+    <EmbeddedResource Include="Content/Board-Opponent-Lich-King-Playmat.jpg" LogicalName="Board-Opponent-Lich-King-Playmat.jpg" />
     <EmbeddedResource Include="Content/Board-Font.png" LogicalName="Board-Font.png" />
     <EmbeddedResource Include="Content/Counter-Digits.png" LogicalName="Counter-Digits.png" />
     <EmbeddedResource Include="Content/MainUI-Mural.png" LogicalName="MainUI-Mural.png" />

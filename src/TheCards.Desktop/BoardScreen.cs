@@ -7,9 +7,14 @@ namespace TheCards.Desktop;
 /// <summary>Hosts one single-player duel. A new screen is created for each visit from the menu.</summary>
 internal sealed class BoardScreen : IScreen
 {
+    private const string HeroArtwork = "Board-Hero-Knight";
+    private const string OpponentArtwork = "Board-Opponent-Lich-King";
     private readonly GameServices services;
     private readonly WindowControls controls;
     private readonly Texture2D heroPortrait;
+    private readonly Texture2D opponentPortrait;
+    private readonly Texture2D heroPlaymat;
+    private readonly Texture2D opponentPlaymat;
     private readonly Texture2D heroHealth;
     private readonly Texture2D heroDropRing;
     private readonly Texture2D badgeBlank;
@@ -27,14 +32,27 @@ internal sealed class BoardScreen : IScreen
         var device = services.Device;
         controls = new WindowControls(services.Audio, isBoard: true);
         boardRasterizer = new RasterizerState { ScissorTestEnable = true };
-        using (var stream = CardGame.OpenEmbeddedAsset("Board-Hero-Knight.png"))
+        using (var stream = CardGame.OpenEmbeddedAsset(HeroArtwork + ".png"))
         using (var portrait = Texture2D.FromStream(device, stream, DefaultColorProcessors.PremultiplyAlpha))
         {
             heroPortrait = CircleTexture.FramePortrait(portrait, BoardUI.HeroPortraitSize, borderWidth: 2);
         }
+        using (var stream = CardGame.OpenEmbeddedAsset(HeroArtwork + "-Playmat.jpg"))
+        {
+            heroPlaymat = Texture2D.FromStream(device, stream);
+        }
         using (var stream = CardGame.OpenEmbeddedAsset("Board-Hero-Health.png"))
         {
             heroHealth = Texture2D.FromStream(device, stream, DefaultColorProcessors.PremultiplyAlpha);
+        }
+        using (var stream = CardGame.OpenEmbeddedAsset(OpponentArtwork + ".png"))
+        using (var portrait = Texture2D.FromStream(device, stream, DefaultColorProcessors.PremultiplyAlpha))
+        {
+            opponentPortrait = CircleTexture.FramePortrait(portrait, BoardUI.HeroPortraitSize, borderWidth: 2);
+        }
+        using (var stream = CardGame.OpenEmbeddedAsset(OpponentArtwork + "-Playmat.jpg"))
+        {
+            opponentPlaymat = Texture2D.FromStream(device, stream);
         }
         heroDropRing = CircleTexture.Create(device, BoardUI.HeroPortraitSize + 6, borderWidth: 3, Color.Transparent);
         badgeBlank = CircleTexture.Create(device, BoardUI.HeroHealthSize, borderWidth: 1, Color.Black);
@@ -42,7 +60,7 @@ internal sealed class BoardScreen : IScreen
         using (var digitSheet = Texture2D.FromStream(device, stream))
         {
             board = new BoardUI(services.Batch, services.Pixel, services.Font, heroPortrait, heroHealth, heroDropRing,
-                badgeBlank, digitSheet);
+                badgeBlank, digitSheet, heroPlaymat, opponentPortrait, opponentPlaymat);
         }
     }
 
@@ -146,6 +164,9 @@ internal sealed class BoardScreen : IScreen
     public void Dispose()
     {
         heroPortrait.Dispose();
+        opponentPortrait.Dispose();
+        heroPlaymat.Dispose();
+        opponentPlaymat.Dispose();
         heroHealth.Dispose();
         heroDropRing.Dispose();
         badgeBlank.Dispose();

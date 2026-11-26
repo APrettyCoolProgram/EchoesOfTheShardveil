@@ -7,21 +7,21 @@ internal sealed class BoardTutorial
     [
         new("Win the duel",
         [
-            "Your Hero and the opposing Leader each start at 20 Health.",
-            "Win by reducing the opposing Leader to zero or forcing them to draw from an empty deck. If both sides lose together, the duel is a draw.",
+            "Your Hero and the Opponent each start at 20 Health.",
+            "Win by reducing the Opponent to zero or forcing them to draw from an empty deck. If both sides lose together, the duel is a draw.",
             "Your cards and controls are at the bottom. The opponent's side is above the center line.",
         ]),
         new("Find your way around",
         [
-            "The opponent's Leader and cards are at the top. Your in-play cards are below the center panel, and your Hero portrait is in the lower left.",
-            "The center panel explains what you can do now and reports the latest action. The sound icon toggles sound.",
+            "The Opponent's portrait and cards are at the top. Your in-play cards are on the lower half, and your Hero portrait is in the lower left.",
+            "Brief updates about the duel appear below the action buttons. The sound icon toggles sound.",
             "Your hand is along the bottom. Hover to reveal a card or right-click for details. The exit icon offers to forfeit and return to the main menu.",
         ], TutorialIllustration.Board),
         new("Hero and counters",
         [
-            "Your Health is centered at the bottom of the Hero portrait. The opposing Leader shows its Health out of 20.",
-            "The badge at the top of your portrait is your Well count, and READY shows how many shards are ready. The card-shaped counters beside it show cards Removed from the game (upper left), your Discard pile (lower left) and your Deck (lower right). Hover any badge for a reminder. SPARK READY means Spark is available.",
-            "DECK, HAND, and DISCARD show card counts. The opposing hand and both decks stay hidden.",
+            "Your Health is centered at the bottom of the Hero portrait. The Opponent has the same Health badge on their portrait.",
+            "The badge at the top of your portrait is your Well count. The card-shaped counters beside it show cards Removed from the game (upper left), your Discard pile (lower left) and your Deck (lower right). Hover any badge for a reminder. SPARK READY means Spark is available.",
+            "The opposing hand and both decks stay hidden.",
         ]),
         new("Slots and discards",
         [
@@ -68,20 +68,20 @@ internal sealed class BoardTutorial
         new("Use the action row",
         [
             "In Main, drag a card onto your portrait for energy or to a highlighted slot to play it. Use Spark adds 1 energy. Go to battle ends Main.",
-            "During combat, click a Unit or Leader to target it. Take the hit declines interception. End battle moves to End.",
+            "During combat, click a Unit or the Opponent portrait to target it. Take the hit declines interception. End battle moves to End.",
             "Use Cancel selection to clear a card or target choice. At End, Discard if above the limit, then click End turn.",
         ]),
         new("Attack and intercept",
         [
-            "Choose a Unit marked ATTACK, then click an opposing Unit or Leader. Most Units cannot attack the turn they arrive.",
+            "Choose a Unit marked ATTACK, then click an opposing Unit or the Opponent portrait. Most Units cannot attack the turn they arrive.",
             "The defender can intercept with a Unit marked BLOCK or take the hit. Each attacker or interceptor acts at most once per turn.",
-            "Units deal their Power simultaneously. The Hero and Leader deal no damage back. A Unit shows Power / remaining Health and is destroyed at zero remaining Health.",
+            "Units deal their Power simultaneously. The Hero and Opponent deal no damage back. A Unit shows Power / remaining Health and is destroyed at zero remaining Health.",
         ]),
         new("Read the keywords",
         [
             "Rush: Attack on arrival.  Vigilant: Stay ready after attacking.",
             "Sentinel: Intercept while exhausted.  Elusive: Only Elusive Units can intercept this attack.",
-            "Pierce: Excess Unit combat damage hits the opposing Leader.  Drain: Restore your Hero by the damage dealt, up to 20 Health.",
+            "Pierce: Excess Unit combat damage hits the Opponent.  Drain: Restore your Hero by the damage dealt, up to 20 Health.",
         ]),
     ];
 

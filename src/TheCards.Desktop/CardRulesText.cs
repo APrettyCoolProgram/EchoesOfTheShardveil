@@ -27,7 +27,7 @@ internal static class CardRulesText
         CardKeyword.Vigilant => "Stays ready after attacking.",
         CardKeyword.Sentinel => "Can intercept while exhausted.",
         CardKeyword.Elusive => "Only Elusive Units can intercept its attacks.",
-        CardKeyword.Pierce => "Excess combat damage hits the opposing Leader.",
+        CardKeyword.Pierce => "Excess combat damage hits the Opponent.",
         CardKeyword.Drain => "Restores your Hero by the damage dealt, up to 20 Health.",
         _ => "",
     };
