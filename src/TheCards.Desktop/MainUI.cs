@@ -41,10 +41,6 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
         var time = (float)gameTime.TotalGameTime.TotalSeconds;
         spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
         spriteBatch.Draw(mural, destination, Color.White);
-        if (useSideScenes)
-        {
-            DrawSideScenes(viewport, destination, time);
-        }
         spriteBatch.End();
 
         var muralTransform = Matrix.CreateScale(
@@ -63,6 +59,12 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
         try
         {
             effects.Draw(time, muralTransform);
+            if (useSideScenes)
+            {
+                spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
+                DrawSideScenes(viewport, destination, time);
+                spriteBatch.End();
+            }
             reveal.Draw(spriteBatch, titleBounds, titleTransform, muralRasterizer, time);
         }
         finally
@@ -127,10 +129,12 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
             solid.X - solidSource.X * scaleX, solid.Y - solidSource.Y * scaleY, 0);
         if (fadeOnLeft)
         {
+            sideEffects.DrawCityLights(spriteBatch, solidSource, transform, time);
             sideEffects.DrawGills(spriteBatch, solidSource, transform, time);
         }
         else
         {
+            sideEffects.DrawForest(spriteBatch, solidSource, transform, time);
             sideEffects.DrawLeaves(spriteBatch, solidSource, transform, time);
         }
     }

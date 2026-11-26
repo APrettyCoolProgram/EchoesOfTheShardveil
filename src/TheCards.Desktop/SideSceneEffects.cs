@@ -8,6 +8,44 @@ internal sealed class SideSceneEffects : IDisposable
 {
     private const int SectorCount = 8;
     private static readonly Rectangle GillArea = new(754, 516, 270, 312);
+    private static readonly Rectangle TreeArea = new(4, 42, 421, 456);
+    private const int LightCellWidth = 24;
+    private const int LightCellHeight = 40;
+    private const int LightAtlasColumns = 8;
+    // Centers and radii of the painted windows and street lights in the distant city.
+    private static readonly (int X, int Y, int Rx, int Ry)[] CityLights =
+    [
+        (820, 415, 9, 17), (820, 457, 10, 14), (829, 424, 5, 10), (837, 422, 4, 8),
+        (796, 432, 4, 7), (812, 438, 4, 6), (790, 461, 7, 9), (779, 462, 4, 5),
+        (800, 454, 5, 7), (834, 453, 4, 6), (841, 453, 4, 6), (850, 452, 5, 9),
+        (861, 451, 4, 6), (868, 454, 4, 5), (876, 449, 4, 7), (882, 454, 3, 4),
+        (712, 454, 4, 6), (731, 463, 4, 5), (715, 469, 3, 4), (725, 475, 4, 4),
+        (733, 477, 3, 4), (739, 479, 3, 4), (749, 482, 4, 4),
+        (682, 467, 3, 4), (690, 472, 3, 4), (700, 472, 4, 5), (700, 480, 3, 4),
+        (684, 482, 4, 4), (704, 487, 7, 6), (716, 483, 3, 4), (716, 489, 3, 4),
+        (729, 485, 4, 4), (741, 487, 4, 4), (713, 496, 4, 4), (727, 494, 4, 5),
+        (736, 496, 4, 4), (748, 503, 4, 4), (658, 494, 3, 4), (668, 497, 3, 4),
+        (677, 502, 3, 4), (682, 504, 3, 4), (687, 505, 3, 4), (696, 507, 3, 5),
+        (701, 507, 3, 5), (706, 508, 3, 5), (712, 509, 3, 5), (716, 510, 3, 4),
+        (655, 521, 3, 4), (672, 518, 4, 4), (698, 520, 3, 4),
+        (727, 524, 5, 5), (743, 528, 4, 5), (752, 531, 3, 4),
+        (777, 542, 5, 6), (791, 550, 5, 5),
+    ];
+    private static readonly Vector2[] Wisps = [new(312, 653), new(281, 816), new(254, 902)];
+    private static readonly Rectangle ForestFogArea = new(25, 335, 475, 869);
+    private static readonly (Vector2 Center, Vector2 Radius, float Angle)[] FogBanks =
+    [
+        (new(277, 418), new(123, 64), -0.42f),
+        (new(268, 535), new(157, 82), -0.46f),
+        (new(219, 638), new(150, 82), -0.18f),
+        (new(111, 745), new(93, 48), -0.34f),
+        (new(180, 797), new(140, 57), 0.20f),
+        (new(329, 811), new(135, 50), -0.54f),
+        (new(307, 879), new(131, 58), -0.38f),
+        (new(220, 954), new(144, 45), -0.28f),
+        (new(170, 1042), new(104, 32), -0.20f),
+        (new(237, 1130), new(138, 42), 0.30f),
+    ];
     private static readonly (Vector2 Center, Vector2[] Outline)[] Gills =
     [
         (new(923, 586), [new(793, 596), new(845, 560), new(911, 533), new(977, 524), new(1023, 528),
@@ -21,36 +59,164 @@ internal sealed class SideSceneEffects : IDisposable
         (new(825, 818), [new(805, 819), new(820, 814), new(838, 814), new(844, 817), new(827, 822)]),
     ];
     private static readonly Color[] LeafColors = [new(182, 116, 62), new(154, 77, 43), new(201, 142, 75), new(102, 118, 115)];
+    // Cross-sections inside the painted path, in source artwork coordinates.
+    private static readonly (int Y, int Left, int Right)[] PathCrossings =
+    [
+        (918, 247, 347),
+        (956, 215, 320),
+        (991, 176, 282),
+        (1028, 133, 242),
+        (1071, 145, 249),
+        (1118, 172, 277),
+        (1165, 208, 311),
+        (1214, 236, 348),
+        (1262, 233, 360),
+    ];
     private readonly Texture2D leaf;
     private readonly Texture2D gillMasks;
+    private readonly Texture2D treeMask;
+    private readonly Texture2D atmosphere;
+    private readonly Texture2D forestFog;
+    private readonly Texture2D cityLightsOff;
+    private readonly int[] flickeringCityLights;
 
     public SideSceneEffects(Texture2D artwork)
     {
         gillMasks = CreateGillMasks(artwork);
         leaf = CreateLeaf(artwork.GraphicsDevice);
+        treeMask = CreateTreeMask(artwork);
+        atmosphere = CreateAtmosphere(artwork.GraphicsDevice);
+        forestFog = CreateForestFog(artwork);
+        cityLightsOff = CreateCityLightsOff(artwork, out flickeringCityLights);
+    }
+
+    /// <summary>Ripples the forest tree and animates the mist and lights around the ruins.</summary>
+    public void DrawForest(SpriteBatch batch, Rectangle crop, Matrix transform, float time)
+    {
+        var scale = new Vector2(transform.M11, transform.M22);
+        var visible = Rectangle.Intersect(crop, TreeArea);
+        // Give the moving strips room to shift without crossing the panel boundary.
+        visible.Inflate(-5, 0);
+        if (visible.Width > 0)
+        {
+            for (var y = visible.Top; y < visible.Bottom; y += 3)
+            {
+                var height = Math.Min(3, visible.Bottom - y);
+                var sway = 2.5f * MathF.Sin(y * 0.031f - time * 1.35f)
+                    + 0.9f * MathF.Sin(y * 0.069f - time * 0.8f);
+                var row = new Rectangle(visible.X - TreeArea.X, y - TreeArea.Y, visible.Width, height);
+                var position = Vector2.Transform(new Vector2(visible.X + sway, y), transform);
+                batch.Draw(treeMask, position, row, Color.White, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            }
+        }
+
+        var fog = Rectangle.Intersect(crop, ForestFogArea);
+        fog.Inflate(-12, -5);
+        if (fog.Width > 0 && fog.Height > 0)
+        {
+            for (var y = fog.Top; y < fog.Bottom; y += 3)
+            {
+                var height = Math.Min(3, fog.Bottom - y);
+                var phase = time * 0.65f - y * 0.012f;
+                var curl = 7f * MathF.Sin(phase) + 3f * MathF.Sin(phase * 1.8f + 1.3f);
+                var row = new Rectangle(fog.X - ForestFogArea.X, y - ForestFogArea.Y, fog.Width, height);
+                var position = Vector2.Transform(new Vector2(fog.X + curl, y), transform);
+                batch.Draw(forestFog, position, row, Color.White * (0.78f + 0.19f * MathF.Sin(phase)),
+                    0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            }
+        }
+
+        for (var i = 0; i < FogBanks.Length; i++)
+        {
+            var (center, radius, angle) = FogBanks[i];
+            var phase = time * (0.29f + i % 3 * 0.08f) + i * 2.1f;
+            var drift = new Vector2(MathF.Cos(phase) * 24, MathF.Sin(phase) * 9);
+            DrawHaze(batch, crop, transform, center + drift, new Vector2(radius.X * 0.68f, radius.Y * 0.55f),
+                new Color(119, 169, 182) * (0.12f + 0.045f * MathF.Sin(phase)), angle + 0.22f * MathF.Cos(phase));
+        }
+
+        for (var i = 0; i < Wisps.Length; i++)
+        {
+            var pulse = 0.5f + 0.5f * MathF.Sin(time * MathHelper.TwoPi / (8.5f + i * 0.7f) + i * 2.1f);
+            var tint = new Color(89, 224, 255);
+            DrawHaze(batch, crop, transform, Wisps[i], new Vector2(30, 47) * (0.92f + 0.12f * pulse),
+                tint * (0.12f + 0.32f * pulse));
+            DrawHaze(batch, crop, transform, Wisps[i], new Vector2(9, 18),
+                new Color(178, 247, 255) * (0.29f + 0.38f * pulse));
+        }
+    }
+
+    /// <summary>Flickers the painted warm window and street lights in the distant fairy city.</summary>
+    public void DrawCityLights(SpriteBatch batch, Rectangle crop, Matrix transform, float time)
+    {
+        const float pauseDuration = 1f;
+        const float offDuration = 1.25f;
+        const float interval = pauseDuration + offDuration;
+        if (flickeringCityLights.Length == 0 || time % interval < pauseDuration)
+        {
+            return;
+        }
+
+        var step = (int)(time / interval);
+        var index = flickeringCityLights[step % flickeringCityLights.Length];
+        var light = CityLightBounds(index);
+        var visible = Rectangle.Intersect(crop, light);
+        if (visible.Width == 0 || visible.Height == 0)
+        {
+            return;
+        }
+
+        var source = visible;
+        source.Offset(index % LightAtlasColumns * LightCellWidth - light.X,
+            index / LightAtlasColumns * LightCellHeight - light.Y);
+        var scale = new Vector2(transform.M11, transform.M22);
+        batch.Draw(cityLightsOff, Vector2.Transform(visible.Location.ToVector2(), transform), source,
+            Color.White, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+    }
+
+    private void DrawHaze(SpriteBatch batch, Rectangle crop, Matrix transform, Vector2 center, Vector2 size,
+        Color tint, float angle = 0)
+    {
+        var margin = Math.Min(Math.Min(center.X - crop.Left, crop.Right - center.X),
+            Math.Min(center.Y - crop.Top, crop.Bottom - center.Y));
+        var radius = size.Length() / 2;
+        var fade = Math.Clamp((margin - radius) / 12, 0, 1);
+        if (fade <= 0)
+        {
+            return;
+        }
+
+        var scale = size * new Vector2(transform.M11 / atmosphere.Width, transform.M22 / atmosphere.Height);
+        batch.Draw(atmosphere, Vector2.Transform(center, transform), null, tint * fade, angle,
+            new Vector2(atmosphere.Width / 2f, atmosphere.Height / 2f), scale, SpriteEffects.None, 0);
     }
 
     /// <summary>Draws tumbling leaves blowing left to right across the forest path.</summary>
     public void DrawLeaves(SpriteBatch batch, Rectangle source, Matrix transform, float time)
     {
-        const int leafCount = 17;
         var scale = new Vector2(transform.M11, transform.M22);
-        for (var i = 0; i < leafCount; i++)
+        for (var i = 0; i < PathCrossings.Length; i++)
         {
-            var clock = time * (0.09f + i % 5 * 0.013f) + i * 0.618f;
+            var (y, left, right) = PathCrossings[i];
+            var depth = i / (float)(PathCrossings.Length - 1);
+            var size = MathHelper.Lerp(0.36f, 0.82f, depth) * (0.9f + i % 3 * 0.08f);
+            var radius = leaf.Width * size / 2 + 2;
+            var clock = time / (3.5f + i % 4 * 0.6f) + i * 0.618f;
             var progress = clock - MathF.Floor(clock);
-            var depth = (i * 7 % leafCount) / (float)(leafCount - 1);
-            var startX = MathHelper.Lerp(248, 88, depth);
-            var endX = MathHelper.Lerp(360, 380, depth);
-            var bounce = MathF.Abs(MathF.Sin(progress * 12 + i)) * MathHelper.Lerp(2, 10, depth);
-            var position = new Vector2(MathHelper.Lerp(startX, endX, progress),
-                MathHelper.Lerp(912, 1310, depth) + 24 * progress - bounce);
+            var travel = Math.Clamp(progress / 0.67f, 0, 1);
+            var gust = travel - 0.11f * MathF.Sin(travel * MathHelper.TwoPi);
+            var bounce = MathF.Abs(MathF.Sin(travel * 18 + i)) * MathHelper.Lerp(1.5f, 5f, depth);
+            var position = new Vector2(MathHelper.Lerp(left + radius, right - radius, gust), y - bounce);
             var margin = Math.Min(Math.Min(position.X - source.Left, source.Right - position.X),
                 Math.Min(position.Y - source.Top, source.Bottom - position.Y));
-            var opacity = Math.Clamp(margin / 24, 0, 1) *
-                Math.Clamp(Math.Min(progress, 1 - progress) * 8, 0, 1);
-            var tumble = time * (2.6f + i % 4 * 0.5f) + i * 2.4f;
-            var size = (0.23f + 0.65f * depth) * (0.85f + i % 3 * 0.17f);
+            var opacity = Math.Clamp((margin - radius) / 10, 0, 1) *
+                Math.Clamp(Math.Min(travel, 1 - travel) * 10, 0, 1);
+            if (opacity <= 0)
+            {
+                continue;
+            }
+
+            var tumble = travel * (9.5f + i % 4 * 1.4f) + i * 2.4f;
             var leafScale = scale * new Vector2(size, size * (0.2f + 0.8f * MathF.Abs(MathF.Sin(tumble))));
             batch.Draw(leaf, Vector2.Transform(position, transform), null, LeafColors[i % LeafColors.Length] * opacity,
                 tumble, new Vector2(leaf.Width / 2f, leaf.Height / 2f), leafScale, SpriteEffects.None, 0);
@@ -158,9 +324,162 @@ internal sealed class SideSceneEffects : IDisposable
         return texture;
     }
 
+    private static Texture2D CreateTreeMask(Texture2D artwork)
+    {
+        var pixels = new Color[TreeArea.Width * TreeArea.Height];
+        artwork.GetData(0, TreeArea, pixels, 0, pixels.Length);
+        for (var y = 0; y < TreeArea.Height; y++)
+        for (var x = 0; x < TreeArea.Width; x++)
+        {
+            var index = y * TreeArea.Width + x;
+            var pixel = pixels[index];
+            var bark = Math.Clamp((94 - Math.Max(pixel.R, pixel.G)) / 52f, 0, 1);
+            var horizontal = Math.Clamp(Math.Min(x, TreeArea.Width - 1 - x) / 38f, 0, 1);
+            var vertical = Math.Clamp(Math.Min(y, TreeArea.Height - 1 - y) / 52f, 0, 1);
+            pixels[index] = pixel * (bark * horizontal * vertical * 0.72f);
+        }
+
+        var texture = new Texture2D(artwork.GraphicsDevice, TreeArea.Width, TreeArea.Height);
+        texture.SetData(pixels);
+        return texture;
+    }
+
+    private static Texture2D CreateAtmosphere(GraphicsDevice device)
+    {
+        const int size = 32;
+        var pixels = new Color[size * size];
+        for (var y = 0; y < size; y++)
+        for (var x = 0; x < size; x++)
+        {
+            var point = new Vector2(x + 0.5f, y + 0.5f) / (size / 2f) - Vector2.One;
+            var falloff = Math.Max(0, 1 - point.LengthSquared());
+            pixels[y * size + x] = Color.White * (falloff * falloff);
+        }
+
+        var texture = new Texture2D(device, size, size);
+        texture.SetData(pixels);
+        return texture;
+    }
+
+    private static Texture2D CreateForestFog(Texture2D artwork)
+    {
+        var pixels = new Color[ForestFogArea.Width * ForestFogArea.Height];
+        artwork.GetData(0, ForestFogArea, pixels, 0, pixels.Length);
+        var coverage = new float[pixels.Length];
+        foreach (var (center, radius, angle) in FogBanks)
+        {
+            var rotation = Matrix.CreateRotationZ(-angle);
+            for (var y = 0; y < ForestFogArea.Height; y++)
+            for (var x = 0; x < ForestFogArea.Width; x++)
+            {
+                var point = new Vector2(ForestFogArea.X + x, ForestFogArea.Y + y);
+                var local = Vector2.Transform(point - center, rotation) / radius;
+                var feather = Math.Clamp((1 - local.LengthSquared()) * 1.5f, 0, 1);
+                var index = y * ForestFogArea.Width + x;
+                coverage[index] = Math.Max(coverage[index], feather * feather);
+            }
+        }
+
+        for (var y = 0; y < ForestFogArea.Height; y++)
+        for (var x = 0; x < ForestFogArea.Width; x++)
+        {
+            var index = y * ForestFogArea.Width + x;
+            var pixel = pixels[index];
+            var cool = Math.Clamp((Math.Min(pixel.G, pixel.B) - pixel.R + 8) / 33f, 0, 1);
+            var luminance = Math.Clamp((pixel.G - 42) / 76f, 0, 1);
+            var point = new Vector2(ForestFogArea.X + x, ForestFogArea.Y + y);
+            var wispClearance = 1f;
+            foreach (var wisp in Wisps)
+            {
+                wispClearance = Math.Min(wispClearance,
+                    Math.Clamp((Vector2.DistanceSquared(point, wisp) - 13 * 13) / (25 * 25 - 13 * 13f), 0, 1));
+            }
+            pixels[index] = pixel * (coverage[index] * cool * luminance * wispClearance * 0.74f);
+        }
+
+        var texture = new Texture2D(artwork.GraphicsDevice, ForestFogArea.Width, ForestFogArea.Height);
+        texture.SetData(pixels);
+        return texture;
+    }
+
+    private static Rectangle CityLightBounds(int index)
+    {
+        var (x, y, rx, ry) = CityLights[index];
+        return new Rectangle(x - rx, y - ry, 2 * rx + 1, 2 * ry + 1);
+    }
+
+    private static Texture2D CreateCityLightsOff(Texture2D artwork, out int[] flickeringLights)
+    {
+        const int width = LightAtlasColumns * LightCellWidth;
+        var height = (CityLights.Length + LightAtlasColumns - 1) / LightAtlasColumns * LightCellHeight;
+        var atlas = new Color[width * height];
+        var paintedLights = new List<int>(CityLights.Length);
+        for (var i = 0; i < CityLights.Length; i++)
+        {
+            var light = CityLightBounds(i);
+            var (_, _, rx, ry) = CityLights[i];
+            var pixels = new Color[light.Width * light.Height];
+            artwork.GetData(0, light, pixels, 0, pixels.Length);
+            var surroundings = Vector3.Zero;
+            var weightSum = 0f;
+            for (var y = 0; y < light.Height; y++)
+            for (var x = 0; x < light.Width; x++)
+            {
+                var distance = new Vector2((x - rx) / (float)rx, (y - ry) / (float)ry).LengthSquared();
+                if (distance < 0.72f || distance > 1.5f)
+                {
+                    continue;
+                }
+
+                var pixel = pixels[y * light.Width + x];
+                var weight = 1f / (16f + Math.Max(0, pixel.R - pixel.B));
+                surroundings += pixel.ToVector3() * weight;
+                weightSum += weight;
+            }
+
+            var unlit = new Color(surroundings / weightSum);
+            var hasPaintedLight = false;
+            for (var y = ry - 2; y <= ry + 2; y++)
+            for (var x = rx - 2; x <= rx + 2; x++)
+            {
+                var pixel = pixels[y * light.Width + x];
+                hasPaintedLight |= pixel.R >= 174 && pixel.G >= 113 &&
+                    pixel.R - pixel.B >= 24 && pixel.R - unlit.R >= 20;
+            }
+            if (!hasPaintedLight)
+            {
+                continue;
+            }
+
+            paintedLights.Add(i);
+            var tileX = i % LightAtlasColumns * LightCellWidth;
+            var tileY = i / LightAtlasColumns * LightCellHeight;
+            for (var y = 0; y < light.Height; y++)
+            for (var x = 0; x < light.Width; x++)
+            {
+                var pixel = pixels[y * light.Width + x];
+                var distance = new Vector2((x - rx) / (float)rx, (y - ry) / (float)ry).LengthSquared();
+                var edge = Math.Clamp((1f - distance) / 0.42f, 0, 1);
+                var warmth = Math.Clamp((pixel.R - pixel.B - 4) / 32f, 0, 1);
+                var brightness = Math.Clamp((pixel.R - unlit.R + 3) / 36f, 0, 1);
+                atlas[(tileY + y) * width + tileX + x] = unlit * (edge * warmth * brightness);
+            }
+        }
+
+        flickeringLights = paintedLights.ToArray();
+        new Random(112).Shuffle(flickeringLights);
+        var texture = new Texture2D(artwork.GraphicsDevice, width, height);
+        texture.SetData(atlas);
+        return texture;
+    }
+
     public void Dispose()
     {
         leaf.Dispose();
         gillMasks.Dispose();
+        treeMask.Dispose();
+        atmosphere.Dispose();
+        forestFog.Dispose();
+        cityLightsOff.Dispose();
     }
 }

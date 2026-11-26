@@ -41,6 +41,7 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
         [new(1153, 350), new(1158, 331), new(1169, 315), new(1184, 307)];
     private static readonly Vector2[] BackpackRightArc =
         [new(1192, 348), new(1198, 328), new(1213, 313), new(1231, 306), new(1244, 294)];
+    private static readonly Rectangle CanisterBubbleMask = new(656, 876, 24, 24);
 
     private static readonly Vector2[] HandUpperArc =
         [new(1025, 519), new(1015, 512), new(1018, 500), new(1026, 491), new(1042, 487)];
@@ -214,6 +215,19 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
             }
         }
 
+        for (var y = 0; y < CanisterBubbleMask.Height; y++)
+        for (var x = 0; x < CanisterBubbleMask.Width; x++)
+        {
+            var point = new Vector2(x + 0.5f, y + 0.5f) / 12f - Vector2.One;
+            var radius = point.Length();
+            var rim = Math.Clamp(1f - MathF.Abs(radius - 0.73f) / 0.23f, 0, 1);
+            var gleam = Math.Clamp(1f - Vector2.Distance(point, new Vector2(-0.36f, -0.43f)) / 0.37f, 0, 1);
+            var glass = Math.Clamp((0.78f - radius) * 6f, 0, 1);
+            var index = (CanisterBubbleMask.Y + y) * area.Width + CanisterBubbleMask.X + x;
+            mask[index] = Color.Lerp(new Color(33, 91, 31), new Color(224, 255, 152), Math.Max(rim * 0.85f, gleam)) *
+                Math.Max(glass * 0.39f, rim * 0.80f);
+        }
+
         var texture = new Texture2D(mural.GraphicsDevice, area.Width, AtlasHeight);
         texture.SetData(mask);
         return texture;
@@ -274,6 +288,12 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
                 var pixel = source[index];
                 var distance = Vector2.Distance(new Vector2(x, y), new Vector2(anchorX, anchorY));
                 var anchored = MathHelper.Clamp((distance - 8f) / 46f, 0f, 1f);
+                if (region.X == 0)
+                {
+                    anchored *= MathHelper.SmoothStep(0, 1,
+                        Math.Clamp(Math.Min(y - region.Top, region.Bottom - y) / 16f, 0, 1));
+                    anchored *= CapeEdgeCoverage(new Vector2(x, y), outline);
+                }
                 var maskIndex = (origin.Y + y - region.Y) * MaskArea.Width + origin.X + x - region.X;
                 mask[maskIndex] = pixel * (coverage(pixel) * anchored);
             }
@@ -286,6 +306,27 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
 
     private static float RedCloth(Color pixel) =>
         MathHelper.Clamp((pixel.R - Math.Max(pixel.G, pixel.B) - 6) / 41f, 0f, 1f);
+
+    private static float CapeEdgeCoverage(Vector2 point, Point[] outline)
+    {
+        const float feather = 7f;
+        var distanceSquared = feather * feather;
+        for (var i = 0; i < outline.Length; i++)
+        {
+            var a = outline[i].ToVector2();
+            var b = outline[(i + 1) % outline.Length].ToVector2();
+            if (a.X == 0 && b.X == 0)
+            {
+                continue;
+            }
+
+            var edge = b - a;
+            var along = Math.Clamp(Vector2.Dot(point - a, edge) / edge.LengthSquared(), 0, 1);
+            distanceSquared = Math.Min(distanceSquared, Vector2.DistanceSquared(point, a + along * edge));
+        }
+
+        return MathHelper.SmoothStep(0, 1, MathF.Sqrt(distanceSquared) / feather);
+    }
 
     private static bool InsideOutline(int x, int y, Point[] outline)
     {
@@ -385,11 +426,12 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
         DrawDragonFire(time);
         DrawCape(VampireCape, time, 1.9f, 0.1f, 10f, VampireCapeMaskOrigin);
         DrawCape(HeroCape, time, 3.5f, 1.8f, 8f, HeroCapeMaskOrigin);
-        DrawCape(KnightUpperCape, time, 2.4f, 2.4f, 8f);
-        DrawCape(KnightLowerCape, time, 2.2f, 4.1f, 10f);
+        DrawCape(KnightUpperCape, time, 2.05f, 2.4f, 8f);
+        DrawCape(KnightLowerCape, time, 2.05f, 2.4f, 10f);
         DrawCape(WizardRobe, time, 2.0f, 3.5f, 7.5f);
         DrawCape(VillainCape, time, 2.6f, 1.1f, 11f);
         DrawCape(WerewolfFur, time, 3.4f, 2.1f, 6f, WerewolfFurMaskOrigin);
+        DrawCanisterBubbles(time);
 
         foreach (var (pane, interval, offset) in Windows)
         {
@@ -412,6 +454,26 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
         }
 
         batch.End();
+    }
+
+    private void DrawCanisterBubbles(float time)
+    {
+        var bottom = new Vector2(1185f, 375.5f);
+        var top = new Vector2(1195f, 361.8f);
+        var across = new Vector2(0.81f, 0.59f);
+        var origin = new Vector2(CanisterBubbleMask.Width / 2f, CanisterBubbleMask.Height / 2f);
+        for (var i = 0; i < 8; i++)
+        {
+            var clock = time * (0.31f + i % 3 * 0.09f) + i * 0.618f;
+            var age = clock - MathF.Floor(clock);
+            var rise = age * (0.72f + age * 0.28f);
+            var wobble = (i % 4 - 1.5f) * 1.65f + 0.90f * MathF.Sin(age * 8f + i * 2.4f);
+            var position = Vector2.Lerp(bottom, top, rise) + across * wobble;
+            var diameter = (2.0f + i % 4 * 0.69f) * (0.63f + 0.5f * age);
+            var opacity = Math.Clamp(age * 8f, 0, 1) * Math.Clamp((1 - age) * 12f, 0, 1);
+            batch.Draw(artworkMask, position, CanisterBubbleMask, Color.White * opacity, 0f, origin,
+                diameter / CanisterBubbleMask.Width, SpriteEffects.None, 0f);
+        }
     }
 
     private void DrawDriftingMist((Rectangle Region, float Angle, float Offset)[] layers,
@@ -502,11 +564,12 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
     {
         var origin = maskOrigin ?? region.Location;
         var cycle = time * rate + offset;
+        var edgeCloth = region.X == 0;
         var rowTop = (float)region.Top;
         for (var y = region.Top; y < region.Bottom; y++)
         {
             var distance = (y - region.Top) / (float)region.Height;
-            var phase = cycle - distance * 9f;
+            var phase = cycle - (edgeCloth ? (y - KnightUpperCape.Y) * 0.036f : distance * 9f);
             var wave = 0.78f * MathF.Sin(phase) + 0.22f * MathF.Sin(phase * 1.7f + 0.9f);
             var shift = amplitude * wave * (0.45f + 0.55f * distance);
             var brightness = 0.85f + 0.15f * MathF.Sin(phase + 0.8f);
@@ -516,10 +579,25 @@ internal sealed class MuralEffects(SpriteBatch batch, Texture2D glow, Texture2D 
                 * MathF.Sin(nextDistance * MathF.PI);
             var rowBottom = y + 1 + lift;
             var source = new Rectangle(origin.X, origin.Y + y - region.Y, region.Width, 1);
-            var x = region.X == 0 ? shift * 0.5f + amplitude * 0.5f : region.X + shift;
-            batch.Draw(artworkMask, new Vector2(x, rowTop), source,
-                new Color(brightness, brightness, brightness) * 0.87f, 0f, Vector2.Zero,
-                new Vector2(1f, rowBottom - rowTop), SpriteEffects.None, 0f);
+            // The knight's cloth runs out of the painting. Let it stretch past that edge
+            // while holding the shoulder end in place.
+            var x = edgeCloth ? Math.Min(0, shift - amplitude) : region.X + shift;
+            var widthScale = edgeCloth ? (region.Width - x) / region.Width : 1f;
+            var tint = new Color(brightness, brightness, brightness) * 0.87f;
+            var scale = new Vector2(widthScale, rowBottom - rowTop);
+            var overhang = (int)MathF.Ceiling(Math.Max(0, -x) / widthScale);
+            for (var column = 0; column < overhang; column += 2)
+            {
+                var width = Math.Min(2, overhang - column);
+                var amount = MathHelper.SmoothStep(0, 1, (column + width / 2f) / overhang);
+                var tip = new Rectangle(source.X + column, source.Y, width, 1);
+                batch.Draw(artworkMask, new Vector2(x + column * widthScale, rowTop), tip,
+                    tint * amount, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            }
+            source.X += overhang;
+            source.Width -= overhang;
+            batch.Draw(artworkMask, new Vector2(x + overhang * widthScale, rowTop), source,
+                tint, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
             rowTop = rowBottom;
         }
     }
