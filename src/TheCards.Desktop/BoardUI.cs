@@ -84,9 +84,10 @@ internal sealed class BoardUI
     private string[] inspectorRows = [];
     private int inspectorScroll;
     private int layoutHeight = Height;
-    private int horizontalPadding;
+    private int layoutWidth = Width;
 
     private int ExtraHeight => layoutHeight - Height;
+    private int ExtraWidth => layoutWidth - Width;
     private int TutorialOffset => ExtraHeight / 2;
     private BoardTutorial tutorial = new();
     private Duel duel;
@@ -213,7 +214,7 @@ internal sealed class BoardUI
     public void SetLayout(BoardViewport viewport)
     {
         layoutHeight = viewport.Height;
-        horizontalPadding = viewport.HorizontalPadding;
+        layoutWidth = viewport.Width;
     }
 
     private static Duel NewDuel()
@@ -396,7 +397,7 @@ internal sealed class BoardUI
         {
             CardType.Unit => UnitBounds(Human, play.BoardSlot!.Value),
             CardType.Relic => RelicBounds(Human, play.BoardSlot!.Value),
-            _ => new Rectangle(1026, 283 + ExtraHeight / 2, 210, 46),
+            _ => new Rectangle(1026 + ExtraWidth, 283 + ExtraHeight / 2, 210, 46),
         };
     }
 
@@ -419,9 +420,9 @@ internal sealed class BoardUI
             return;
         }
 
-        if (inspectedCard is not null && InspectorPanel.Contains(position))
+        if (inspectedCard is not null && AtRight(InspectorPanel).Contains(position))
         {
-            if (InspectorClose.Contains(position))
+            if (AtRight(InspectorClose).Contains(position))
             {
                 CloseInspector();
             }
@@ -599,7 +600,7 @@ internal sealed class BoardUI
 
     public void ScrollInspector(Point position, int direction)
     {
-        if (!tutorial.IsOpen && inspectedCard is not null && InspectorPanel.Contains(position))
+        if (!tutorial.IsOpen && inspectedCard is not null && AtRight(InspectorPanel).Contains(position))
         {
             inspectorScroll = Math.Clamp(inspectorScroll + direction * 2, 0,
                 Math.Max(0, inspectorRows.Length - InspectorVisibleRows));
@@ -666,18 +667,26 @@ internal sealed class BoardUI
 
     private Rectangle AtBottom(Rectangle bounds)
     {
-        bounds.Offset(0, ExtraHeight);
+        var offsetX = bounds == RematchButton ? ExtraWidth / 2
+            : bounds == NextButton || bounds == CancelButton ? ExtraWidth : 0;
+        bounds.Offset(offsetX, ExtraHeight);
+        return bounds;
+    }
+
+    private Rectangle AtRight(Rectangle bounds)
+    {
+        bounds.Offset(ExtraWidth, 0);
         return bounds;
     }
 
     private Rectangle InTutorial(Rectangle bounds)
     {
-        bounds.Offset(0, TutorialOffset);
+        bounds.Offset(ExtraWidth / 2, TutorialOffset);
         return bounds;
     }
 
     private Rectangle AcrossWindow(int y, int height) =>
-        new(-horizontalPadding, y, Width + 2 * horizontalPadding, height);
+        new(0, y, layoutWidth, height);
 
     private int SideTop(int player) => player == Human
         ? 352 + ExtraHeight * 3 / 4
@@ -753,8 +762,11 @@ internal sealed class BoardUI
         return delta.X * delta.X + delta.Y * delta.Y <= HeroPortraitSize * HeroPortraitSize / 4;
     }
 
-    private Rectangle UnitBounds(int player, int slot) => CardBounds(265 + slot * 150, SideTop(player));
-    private Rectangle RelicBounds(int player, int slot) => CardBounds(1008 + slot * 131, SideTop(player));
+    private Rectangle UnitBounds(int player, int slot) =>
+        CardBounds(265 + slot * 150 + ExtraWidth * (slot + 1) / (Duel.UnitSlots + 1), SideTop(player));
+
+    private Rectangle RelicBounds(int player, int slot) =>
+        CardBounds(1008 + slot * 131 + ExtraWidth, SideTop(player));
 
     private static Rectangle CardBounds(int x, int y, int width = 95) =>
         new(x, y, width, width / 5 * 7);
@@ -763,7 +775,7 @@ internal sealed class BoardUI
     {
         const int spacing = 8;
         // Cards are centered in the space to the right of the Hero portrait.
-        var available = HandAreaRight - HandAreaLeft;
+        var available = HandAreaRight + ExtraWidth - HandAreaLeft;
         var width = Math.Min(95, (available - spacing * (count - 1)) / Math.Max(1, count));
         width = Math.Max(5, width / 5 * 5);
         var total = width * count + spacing * (count - 1);
@@ -941,7 +953,7 @@ internal sealed class BoardUI
     {
         Fill(AcrossWindow(0, layoutHeight), new Color(0, 0, 0) * 0.75f);
         Box(InTutorial(TutorialPanel), new Color(19, 34, 43), new Color(73, 110, 120));
-        var left = TutorialPanel.X + 36;
+        var left = InTutorial(TutorialPanel).X + 36;
         if (tutorial.IsPrompt)
         {
             Text("BEFORE THE DUEL", left, 161 + TutorialOffset, 21, Teal);
@@ -1034,7 +1046,7 @@ internal sealed class BoardUI
         };
         if (status.Length > 0)
         {
-            CenterText(status, Width / 2, layoutHeight - 172, 16, Ivory);
+            CenterText(status, layoutWidth / 2, layoutHeight - 172, 16, Ivory);
         }
     }
 
@@ -1107,13 +1119,13 @@ internal sealed class BoardUI
 
     private void DrawInspector(CardDefinition card)
     {
-        Box(InspectorPanel, new Color(19, 34, 43), new Color(73, 110, 120));
-        Text("CARD DETAILS", 631, 94, 15, Teal);
-        Button(InspectorClose, "Close", false, quiet: true);
-        var preview = CardBounds(628, 121, 140);
+        Box(AtRight(InspectorPanel), new Color(19, 34, 43), new Color(73, 110, 120));
+        Text("CARD DETAILS", 631 + ExtraWidth, 94, 15, Teal);
+        Button(AtRight(InspectorClose), "Close", false, quiet: true);
+        var preview = CardBounds(628 + ExtraWidth, 121, 140);
         DrawCard(preview, card, true, enlarged: true);
 
-        const int left = 789;
+        var left = 789 + ExtraWidth;
         Text(card.Name, left, 107, 30, Ivory);
         var type = card.Subtype is { Length: > 0 } subtype ? $"{card.Type} / {subtype}" : card.Type.ToString();
         Text($"{type}   |   {card.Cost} energy", left, 144, 18, Teal);

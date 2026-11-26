@@ -3,24 +3,22 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace TheCards.Desktop;
 
-/// <summary>Maps a uniformly scaled board to a full window, allowing the layout to grow vertically.</summary>
+/// <summary>Maps a uniformly scaled board to a full window, allowing the layout to grow on either axis.</summary>
 internal readonly record struct BoardViewport
 {
     private readonly Viewport viewport;
     private readonly float scale;
-    private readonly float offsetX;
 
     public BoardViewport(Viewport viewport)
     {
         this.viewport = viewport;
         scale = Math.Min((float)viewport.Width / BoardUI.Width, (float)viewport.Height / BoardUI.Height);
-        offsetX = Math.Max(0f, (viewport.Width - BoardUI.Width * scale) * 0.5f);
     }
 
     public bool IsDrawable => scale > 0;
     public int Height => IsDrawable ? (int)MathF.Ceiling(viewport.Height / scale) : BoardUI.Height;
-    public int HorizontalPadding => IsDrawable ? (int)MathF.Ceiling(offsetX / scale) : 0;
-    public Matrix Transform => Matrix.CreateScale(scale, scale, 1f) * Matrix.CreateTranslation(offsetX, 0f, 0f);
+    public int Width => IsDrawable ? (int)MathF.Ceiling(viewport.Width / scale) : BoardUI.Width;
+    public Matrix Transform => Matrix.CreateScale(scale, scale, 1f);
 
     public bool TryMap(Point mouse, Rectangle client, out Point position)
     {
@@ -31,13 +29,8 @@ internal readonly record struct BoardViewport
             return false;
         }
 
-        var x = (mouse.X * ((float)viewport.Width / client.Width) - offsetX) / scale;
+        var x = mouse.X * ((float)viewport.Width / client.Width) / scale;
         var y = mouse.Y * ((float)viewport.Height / client.Height) / scale;
-        if (x < 0 || x >= BoardUI.Width)
-        {
-            return false;
-        }
-
         position = new((int)x, (int)y);
         return true;
     }

@@ -9,6 +9,8 @@ internal sealed class MenuScreen : IScreen
 {
     private readonly GameServices services;
     private readonly Texture2D mural;
+    private readonly Texture2D sideScenes;
+    private readonly SideSceneEffects sideEffects;
     private readonly Texture2D title;
     private readonly Texture2D menu;
     private readonly Texture2D glow;
@@ -30,6 +32,10 @@ internal sealed class MenuScreen : IScreen
         {
             mural = Texture2D.FromStream(device, stream);
         }
+        using (var stream = CardGame.OpenEmbeddedAsset("MainUI-SideScenes.png"))
+        {
+            sideScenes = Texture2D.FromStream(device, stream);
+        }
         using (var stream = CardGame.OpenEmbeddedAsset("MainUI-Title.png"))
         {
             title = Texture2D.FromStream(device, stream, DefaultColorProcessors.PremultiplyAlpha);
@@ -42,7 +48,8 @@ internal sealed class MenuScreen : IScreen
         artworkMask = MuralEffects.CreateArtworkMask(mural);
         muralRasterizer = new RasterizerState { ScissorTestEnable = true };
         titleReveal = new TitleReveal(title, glow);
-        mainUI = new MainUI(device, services.Batch, mural, title, menu,
+        sideEffects = new SideSceneEffects(sideScenes);
+        mainUI = new MainUI(device, services.Batch, mural, sideScenes, sideEffects, title, menu,
             new MuralEffects(services.Batch, glow, artworkMask, mural, muralRasterizer), titleReveal, muralRasterizer);
         Activate();
     }
@@ -105,6 +112,8 @@ internal sealed class MenuScreen : IScreen
         menu.Dispose();
         titleReveal.Dispose();
         title.Dispose();
+        sideEffects.Dispose();
+        sideScenes.Dispose();
         mural.Dispose();
     }
 }
