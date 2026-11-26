@@ -7,14 +7,18 @@
 </div>
 
 ```
-dotnet clean && dotnet build TheCards.slnx && dotnet test && dotnet run --project TheCards.Desktop/TheCards.Desktop.csproj
+dotnet clean && dotnet build EchoesOfTheShardveil.slnx && dotnet test && dotnet run --project EchoesOfTheShardveil.Desktop/EchoesOfTheShardveil.Desktop.csproj
 ```
 
 ```
-dotnet clean && dotnet build TheCards.slnx && dotnet test && dotnet publish TheCards.Desktop/TheCards.Desktop.csproj -c Release -r osx-arm64 --self-contained
+dotnet clean && dotnet build EchoesOfTheShardveil.slnx && dotnet test && dotnet publish EchoesOfTheShardveil.Desktop/EchoesOfTheShardveil.Desktop.csproj -c Release -r osx-arm64 --self-contained
 ```
 
 alpha.02
 ```
-/Users/csb/Repositories/APCP/TheCards/src/TheCards.Desktop/bin/Release/net11.0/osx-arm64/publish/TheCards.Desktop --alpha-duel
+/Users/csb/Repositories/APCP/EchoesOfTheShardveil/src/EchoesOfTheShardveil.Desktop/bin/Release/net11.0/osx-arm64/publish/EchoesOfTheShardveil.Desktop --alpha-duel
 ```
+
+
+Shard Veil Echo
+

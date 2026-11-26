@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\EchoesOfTheShardveil.Core\EchoesOfTheShardveil.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.6.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Content/EchoesOfTheShardveil.bmp" LogicalName="Icon.bmp" />
+    <EmbeddedResource Include="Content/Board-Hero-Health.png" LogicalName="Board-Hero-Health.png" />
+    <EmbeddedResource Include="Content/Board-Hero-Knight-Playmat.jpg" LogicalName="Board-Hero-Knight-Playmat.jpg" />
+    <EmbeddedResource Include="Content/Board-Hero-Knight.png" LogicalName="Board-Hero-Knight.png" />
+    <EmbeddedResource Include="Content/Board-Opponent-Lich-King.png" LogicalName="Board-Opponent-Lich-King.png" />
+    <EmbeddedResource Include="Content/Board-Opponent-Lich-King-Playmat.jpg" LogicalName="Board-Opponent-Lich-King-Playmat.jpg" />
+    <EmbeddedResource Include="Content/Board-Font.png" LogicalName="Board-Font.png" />
+    <EmbeddedResource Include="Content/Counter-Digits.png" LogicalName="Counter-Digits.png" />
+    <EmbeddedResource Include="Content/MainUI-Mural.png" LogicalName="MainUI-Mural.png" />
+    <EmbeddedResource Include="Content/MainUI-SideScenes.png" LogicalName="MainUI-SideScenes.png" />
+    <EmbeddedResource Include="Content/MainUI-Menu.png" LogicalName="MainUI-Menu.png" />
+    <EmbeddedResource Include="Content/MainUI-Title.png" LogicalName="MainUI-Title.png" />
+    <EmbeddedResource Include="Content/MainUI-Theme.wav" LogicalName="MainUI-Theme.wav" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ApplicationIcon>Content/EchoesOfTheShardveil.ico</ApplicationIcon>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishSelfContained>true</PublishSelfContained>
+    <!-- Self-contained publishing needs a runtime. Default to this machine's (osx-arm64 on the dev Mac);
+         pass -r to publish for another platform. Normal builds stay runtime-neutral. -->
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(_IsPublishing)' == 'true'">$(NETCoreSdkPortableRuntimeIdentifier)</RuntimeIdentifier>
+    <!-- MonoGame's SDL loader needs the extracted assembly and native library on disk. -->
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);NETSDK1244</MSBuildWarningsAsMessages>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+  </PropertyGroup>
+
+</Project>
