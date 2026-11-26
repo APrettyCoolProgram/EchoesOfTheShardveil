@@ -13,14 +13,14 @@ internal sealed class BoardTutorial
         ]),
         new("Find your way around",
         [
-            "The opponent's Leader and cards are at the top. Your Hero portrait and in-play cards are below the center panel.",
+            "The opponent's Leader and cards are at the top. Your in-play cards are below the center panel, and your Hero portrait is in the lower left.",
             "The center panel explains what you can do now and reports the latest action. The sound icon toggles sound.",
             "Your hand is along the bottom. Hover to reveal a card or right-click for details. The exit icon offers to forfeit and return to the main menu.",
         ], TutorialIllustration.Board),
         new("Hero and counters",
         [
             "Your Health is centered at the bottom of the Hero portrait. The opposing Leader shows its Health out of 20.",
-            "The teal number at the top of your portrait is your Well count. The number beside it shows ready shards. SPARK READY means Spark is available.",
+            "The badge at the top of your portrait is your Well count, and READY shows how many shards are ready. The card-shaped counters beside it show cards Removed from the game (upper left), your Discard pile (lower left) and your Deck (lower right). Hover any badge for a reminder. SPARK READY means Spark is available.",
             "DECK, HAND, and DISCARD show card counts. The opposing hand and both decks stay hidden.",
         ]),
         new("Slots and discards",

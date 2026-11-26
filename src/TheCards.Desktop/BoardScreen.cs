@@ -12,6 +12,7 @@ internal sealed class BoardScreen : IScreen
     private readonly Texture2D heroPortrait;
     private readonly Texture2D heroHealth;
     private readonly Texture2D heroDropRing;
+    private readonly Texture2D badgeBlank;
     private readonly RasterizerState boardRasterizer;
     private readonly BoardUI board;
     // Start as held so the click that opened the board is not treated as a board click.
@@ -36,7 +37,13 @@ internal sealed class BoardScreen : IScreen
             heroHealth = Texture2D.FromStream(device, stream, DefaultColorProcessors.PremultiplyAlpha);
         }
         heroDropRing = CircleTexture.Create(device, BoardUI.HeroPortraitSize + 6, borderWidth: 3, Color.Transparent);
-        board = new BoardUI(services.Batch, services.Pixel, services.Font, heroPortrait, heroHealth, heroDropRing);
+        badgeBlank = CircleTexture.Create(device, BoardUI.HeroHealthSize, borderWidth: 1, Color.Black);
+        using (var stream = CardGame.OpenEmbeddedAsset("Counter-Digits.png"))
+        using (var digitSheet = Texture2D.FromStream(device, stream))
+        {
+            board = new BoardUI(services.Batch, services.Pixel, services.Font, heroPortrait, heroHealth, heroDropRing,
+                badgeBlank, digitSheet);
+        }
     }
 
     public string Title => "The Cards - Single player";
@@ -141,6 +148,8 @@ internal sealed class BoardScreen : IScreen
         heroPortrait.Dispose();
         heroHealth.Dispose();
         heroDropRing.Dispose();
+        badgeBlank.Dispose();
+        board.Dispose();
         boardRasterizer.Dispose();
     }
 }

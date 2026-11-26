@@ -12,6 +12,7 @@ internal sealed class CardGame : Game
     private Texture2D? pixel;
     private Texture2D? font;
     private DesktopDrawable? drawable;
+    private QuitWatcher? quitWatcher;
     private MenuScreen? menu;
     private BoardScreen? board;
     private bool exitConfirmed;
@@ -44,6 +45,7 @@ internal sealed class CardGame : Game
             font = Texture2D.FromStream(GraphicsDevice, stream, DefaultColorProcessors.PremultiplyAlpha);
         }
         drawable = new DesktopDrawable();
+        quitWatcher = new QuitWatcher();
         menu = new MenuScreen(new GameServices(GraphicsDevice, batch, pixel, font, audio));
         Window.Title = menu.Title;
         audio.Start();
@@ -83,6 +85,12 @@ internal sealed class CardGame : Game
     protected override void OnExiting(object sender, ExitingEventArgs args)
     {
         base.OnExiting(sender, args);
+        // Quitting the application (such as from the macOS menu bar) exits at once.
+        if (quitWatcher?.TakeApplicationQuit() == true)
+        {
+            return;
+        }
+
         // The window's close button asks first: the menu offers to quit, the board offers to forfeit.
         if (!exitConfirmed && Current is { } screen)
         {
@@ -107,6 +115,7 @@ internal sealed class CardGame : Game
             font?.Dispose();
             pixel?.Dispose();
             batch?.Dispose();
+            quitWatcher?.Dispose();
             drawable?.Dispose();
         }
         base.Dispose(disposing);

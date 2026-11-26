@@ -12,6 +12,31 @@ internal sealed class BoardUI
     public const int HeroPortraitSize = 176;
     public const int HeroHealthSize = 36;
     private const int HealthAtlasColumns = 6;
+    private const int HealthAtlasCount = 21;
+    // Card-shaped counters (Removed and Discard on the left, Deck on the right) flank the Hero portrait.
+    // Both dimensions are odd so a digit with an odd size sits exactly in the middle (25 x 35 is 5:7 like a card).
+    private const int CounterWidth = 25;
+    private const int CounterHeight = 35;
+    private const int CounterDigitHeight = 15;
+    private const int CounterGap = 14;
+    private const int CounterEdge = 24;
+    // The portrait is round, so it tucks in until its rim is 5 pixels from the nearest corner of the
+    // Removed and Discard counters. Deck mirrors that on the right.
+    private const int PortraitClearance = 5;
+    private static readonly int PortraitLeft = ComputePortraitLeft();
+    private static readonly int DeckCounterLeft = 2 * (PortraitLeft + HeroPortraitSize / 2) - (CounterEdge + CounterWidth);
+    private static readonly int HandAreaLeft = DeckCounterLeft + CounterWidth + CounterGap;
+    private const int HandAreaRight = Width - 24;
+    private const string HealthTooltip =
+        "HEALTH|Your Hero's remaining Health. Units and effects reduce it, and you lose at 0.";
+    private const string WellTooltip =
+        "WELL|Shards in your Well. Each one refills at the start of your turn and pays 1 energy. Once per turn, drag a card onto your portrait to add a shard.";
+    private const string DiscardTooltip =
+        "DISCARD|Cards in your discard pile: used Spells, destroyed Units, and cards discarded to the hand limit.";
+    private const string DeckTooltip =
+        "DECK|Cards left in your deck. You draw one at the start of each turn, and you lose if you must draw from an empty deck.";
+    private const string RemovedTooltip =
+        "REMOVED|Cards removed from the game. They can't return. No cards use this yet.";
     public static readonly Color BackgroundColor = new(12, 21, 27);
 
     private const int Human = 0;
@@ -47,6 +72,8 @@ internal sealed class BoardUI
     private readonly Texture2D heroPortrait;
     private readonly Texture2D heroHealth;
     private readonly Texture2D heroDropRing;
+    private readonly Texture2D badgeBlank;
+    private readonly Texture2D[] counterDigits;
     private readonly HashSet<int> mulligan = [];
     private readonly float[] handLift = new float[Duel.DeckSize];
     private int hoveredHand = -1;
@@ -67,9 +94,11 @@ internal sealed class BoardUI
     private HandDrag? handDrag;
     private double computerDelay;
     private string message = "";
+    private Point? hoverPointer;
 
     public BoardUI(SpriteBatch batch, Texture2D pixel, Texture2D font,
-        Texture2D heroPortrait, Texture2D heroHealth, Texture2D heroDropRing)
+        Texture2D heroPortrait, Texture2D heroHealth, Texture2D heroDropRing, Texture2D badgeBlank,
+        Texture2D counterDigitSheet)
     {
         this.batch = batch;
         this.pixel = pixel;
@@ -77,9 +106,102 @@ internal sealed class BoardUI
         this.heroPortrait = heroPortrait;
         this.heroHealth = heroHealth;
         this.heroDropRing = heroDropRing;
+        this.badgeBlank = badgeBlank;
+        counterDigits = BuildCounterDigits(counterDigitSheet);
         duel = NewDuel();
         own = duel.View(Human, Human);
         enemy = duel.View(Opponent, Human);
+    }
+
+    private static int ComputePortraitLeft()
+    {
+        // Removed's lower inner corner is (HeroPortraitSize / 2 - CounterHeight) above the portrait's center line.
+        var radius = HeroPortraitSize / 2;
+        var vertical = radius - CounterHeight;
+        var horizontal = (int)MathF.Ceiling(MathF.Sqrt((radius + PortraitClearance) * (radius + PortraitClearance)
+            - vertical * vertical));
+        return CounterEdge + CounterWidth + horizontal - radius;
+    }
+
+    public void Dispose()
+    {
+        foreach (var digit in counterDigits)
+        {
+            digit.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Shrinks the regular-weight sans-serif digits 0-9 from a one-row sheet to counter size with an area
+    /// average. Every digit texture has the same height and an odd width, so numbers share a baseline and,
+    /// in a counter with odd dimensions, center exactly.
+    /// </summary>
+    private static Texture2D[] BuildCounterDigits(Texture2D sheet)
+    {
+        var cellWidth = sheet.Width / 10;
+        var cellHeight = sheet.Height;
+        var pixels = new Color[sheet.Width * sheet.Height];
+        sheet.GetData(pixels);
+        var glyphs = new Rectangle[10];
+        int top = int.MaxValue, bottom = int.MinValue;
+        for (var digit = 0; digit < glyphs.Length; digit++)
+        {
+            int minX = cellWidth, minY = cellHeight, maxX = -1, maxY = -1;
+            for (var y = 0; y < cellHeight; y++)
+            {
+                for (var x = 0; x < cellWidth; x++)
+                {
+                    if (pixels[y * sheet.Width + digit * cellWidth + x].R < 24)
+                    {
+                        continue;
+                    }
+                    minX = Math.Min(minX, x);
+                    maxX = Math.Max(maxX, x);
+                    minY = Math.Min(minY, y);
+                    maxY = Math.Max(maxY, y);
+                }
+            }
+            glyphs[digit] = new Rectangle(digit * cellWidth + minX, minY, maxX - minX + 1, maxY - minY + 1);
+            top = Math.Min(top, minY);
+            bottom = Math.Max(bottom, maxY + 1);
+        }
+
+        var scale = (float)CounterDigitHeight / (bottom - top);
+        var textures = new Texture2D[glyphs.Length];
+        for (var digit = 0; digit < glyphs.Length; digit++)
+        {
+            var glyph = glyphs[digit];
+            // Round the width to the nearest odd number.
+            var width = Math.Max(1, (int)MathF.Round((glyph.Width * scale - 1) / 2) * 2 + 1);
+            var output = new Color[width * CounterDigitHeight];
+            for (var y = 0; y < CounterDigitHeight; y++)
+            {
+                var sourceTop = top + y / scale;
+                var sourceBottom = top + (y + 1) / scale;
+                for (var x = 0; x < width; x++)
+                {
+                    var sourceLeft = glyph.X + x * glyph.Width / (float)width;
+                    var sourceRight = glyph.X + (x + 1) * glyph.Width / (float)width;
+                    float sum = 0, weight = 0;
+                    for (var sy = (int)MathF.Floor(sourceTop); sy < (int)MathF.Ceiling(sourceBottom); sy++)
+                    {
+                        for (var sx = (int)MathF.Floor(sourceLeft); sx < (int)MathF.Ceiling(sourceRight); sx++)
+                        {
+                            if (sx >= glyph.X && sx < glyph.Right && sy >= 0 && sy < cellHeight)
+                            {
+                                sum += pixels[sy * sheet.Width + sx].R;
+                                weight++;
+                            }
+                        }
+                    }
+                    var coverage = weight == 0 ? 0 : sum / weight / 255f;
+                    output[y * width + x] = new Color(coverage, coverage, coverage, coverage);
+                }
+            }
+            textures[digit] = new Texture2D(sheet.GraphicsDevice, width, CounterDigitHeight);
+            textures[digit].SetData(output);
+        }
+        return textures;
     }
 
     public void SetLayout(BoardViewport viewport)
@@ -120,6 +242,7 @@ internal sealed class BoardUI
 
     public void Update(TimeSpan elapsed, Point? pointer = null)
     {
+        hoverPointer = pointer;
         if (tutorial.IsOpen)
         {
             return;
@@ -555,12 +678,65 @@ internal sealed class BoardUI
         : 122 + ExtraHeight / 4;
 
     private Rectangle OpponentLeaderBounds() => CardBounds(28, SideTop(Opponent), 80);
-    private Rectangle HeroPortraitBounds() => new(24, SideTop(Human) - 2, HeroPortraitSize, HeroPortraitSize);
-    private Rectangle HeroHealthBounds()
+    // The portrait sits in the lower-left corner, low enough that its Health badge stays inside the window.
+    private Rectangle HeroPortraitBounds() => new(PortraitLeft, layoutHeight - HeroPortraitSize - HeroHealthSize / 2 - 10,
+        HeroPortraitSize, HeroPortraitSize);
+
+    /// <summary>Returns a badge centered on the portrait's rim at a clock position (12 is the top).</summary>
+    private Rectangle RimBadge(float hour)
     {
         var portrait = HeroPortraitBounds();
-        return new(portrait.Center.X - HeroHealthSize / 2, portrait.Bottom - HeroHealthSize / 2,
-            HeroHealthSize, HeroHealthSize);
+        var angle = hour / 12f * MathHelper.TwoPi;
+        var radius = HeroPortraitSize / 2f;
+        var x = portrait.Center.X + (int)MathF.Round(radius * MathF.Sin(angle));
+        var y = portrait.Center.Y - (int)MathF.Round(radius * MathF.Cos(angle));
+        return new(x - HeroHealthSize / 2, y - HeroHealthSize / 2, HeroHealthSize, HeroHealthSize);
+    }
+
+    private Rectangle HeroHealthBounds() => RimBadge(6);
+    private Rectangle HeroWellBounds() => RimBadge(12);
+
+    // Removed lines up with the top of the portrait and Discard with its bottom.
+    private Rectangle RemovedCounterBounds() => new(CounterEdge, HeroPortraitBounds().Top, CounterWidth, CounterHeight);
+    private Rectangle DiscardCounterBounds() => new(CounterEdge, HeroPortraitBounds().Bottom - CounterHeight, CounterWidth, CounterHeight);
+    // Deck mirrors Discard on the other side of the portrait.
+    private Rectangle DeckCounterBounds() => new(DeckCounterLeft, DiscardCounterBounds().Y, CounterWidth, CounterHeight);
+
+    /// <summary>The round badges on the Hero portrait, with their hover text.</summary>
+    private (Rectangle Bounds, int Value, string Tooltip)[] HeroBadges() =>
+    [
+        (HeroWellBounds(), own.Shards, WellTooltip),
+        (HeroHealthBounds(), own.Health, HealthTooltip),
+    ];
+
+    /// <summary>The card-shaped counters beside the portrait, with their hover text.</summary>
+    private (Rectangle Bounds, int Value, string Tooltip)[] CardCounters() =>
+    [
+        (RemovedCounterBounds(), 0, RemovedTooltip), // The duel has no removed zone yet.
+        (DiscardCounterBounds(), own.Discard.Count, DiscardTooltip),
+        (DeckCounterBounds(), own.DeckCount, DeckTooltip),
+    ];
+
+    private static bool InBadge(Rectangle badge, Point position)
+    {
+        var delta = position - badge.Center;
+        return delta.X * delta.X + delta.Y * delta.Y <= HeroHealthSize * HeroHealthSize / 4;
+    }
+
+    private void DrawCardCounter(Rectangle bounds, int value)
+    {
+        Box(bounds, Color.Black, Color.White);
+        const int gap = 1; // With odd digit widths this keeps the whole number's width odd.
+        var label = Math.Max(0, value).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var digits = label.Select(character => counterDigits[character - '0']).ToArray();
+        var total = digits.Sum(digit => digit.Width) + gap * (digits.Length - 1);
+        var x = bounds.X + (bounds.Width - total) / 2;
+        var y = bounds.Y + (bounds.Height - CounterDigitHeight) / 2;
+        foreach (var digit in digits)
+        {
+            batch.Draw(digit, new Vector2(x, y), Color.White);
+            x += digit.Width + gap;
+        }
     }
 
     private bool IsOverHeroPortrait(Point position)
@@ -578,10 +754,13 @@ internal sealed class BoardUI
     private Rectangle HandBounds(int slot, int count)
     {
         const int spacing = 8;
-        var width = Math.Min(95, (1224 - spacing * (count - 1)) / Math.Max(1, count));
+        // Cards are centered in the space to the right of the Hero portrait.
+        var available = HandAreaRight - HandAreaLeft;
+        var width = Math.Min(95, (available - spacing * (count - 1)) / Math.Max(1, count));
         width = Math.Max(5, width / 5 * 5);
         var total = width * count + spacing * (count - 1);
-        return CardBounds((Width - total) / 2 + (width + spacing) * slot, layoutHeight - width / 5 * 7 / 2, width);
+        return CardBounds(HandAreaLeft + (available - total) / 2 + (width + spacing) * slot,
+            layoutHeight - width / 5 * 7 / 2, width);
     }
 
     public void Draw(BoardViewport view, RasterizerState rasterizer)
@@ -604,9 +783,13 @@ internal sealed class BoardUI
         {
             DrawTutorial();
         }
-        else if (inspectedCard is { } card)
+        else
         {
-            DrawInspector(card);
+            if (inspectedCard is { } card)
+            {
+                DrawInspector(card);
+            }
+            DrawBadgeTooltip();
         }
         batch.End();
     }
@@ -630,16 +813,15 @@ internal sealed class BoardUI
                 batch.Draw(heroDropRing, dropRing, IsOverHeroPortrait(pointer) ? Gold : Teal);
             }
 
-            var wellCount = new Rectangle(portrait.Center.X - 17, portrait.Y + 5, 34, 25);
-            RoundedFill(wellCount, BackgroundColor * 0.90f);
-            CenterText(shards, wellCount.Center.X, wellCount.Y + 2, 23, Teal);
-
-            var healthCount = HeroHealthBounds();
-            var cellSize = heroHealth.Width / HealthAtlasColumns;
-            var healthTile = new Rectangle(view.Health % HealthAtlasColumns * cellSize,
-                view.Health / HealthAtlasColumns * cellSize, cellSize, cellSize);
-            batch.Draw(heroHealth, healthCount, healthTile, Color.White);
-            statsX = portrait.Right + 4;
+            foreach (var (bounds, value, _) in HeroBadges())
+            {
+                DrawBadge(bounds, value);
+            }
+            foreach (var (bounds, value, _) in CardCounters())
+            {
+                DrawCardCounter(bounds, value);
+            }
+            statsX = 28;
             Text($"{view.ReadyShards} READY", statsX, top + 20, 12, Teal);
         }
         else
@@ -700,6 +882,64 @@ internal sealed class BoardUI
                 DashedSlot(bounds);
                 CenterText($"RELIC {i + 1}", bounds.Center.X, bounds.Center.Y - 9, 16, Muted);
             }
+        }
+    }
+
+    /// <summary>Draws a number from the round badge atlas shared by the portrait counters.</summary>
+    private void DrawBadge(Rectangle bounds, int value)
+    {
+        if (value >= HealthAtlasCount)
+        {
+            // The atlas stops at 20, so larger numbers are drawn as text on a blank badge.
+            batch.Draw(badgeBlank, bounds, Color.White);
+            var label = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            CenterText(label, bounds.Center.X, bounds.Center.Y - 9, 18, Color.White);
+            return;
+        }
+
+        var index = Math.Max(0, value);
+        var cellSize = heroHealth.Width / HealthAtlasColumns;
+        var tile = new Rectangle(index % HealthAtlasColumns * cellSize, index / HealthAtlasColumns * cellSize,
+            cellSize, cellSize);
+        batch.Draw(heroHealth, bounds, tile, Color.White);
+    }
+
+    private void DrawBadgeTooltip()
+    {
+        if (handDrag is { Started: true } || hoverPointer is not { } pointer)
+        {
+            return;
+        }
+
+        var hovered = HeroBadges().Where(badge => InBadge(badge.Bounds, pointer))
+            .Concat(CardCounters().Where(counter => counter.Bounds.Contains(pointer))).ToArray();
+        if (hovered.Length == 0)
+        {
+            return;
+        }
+
+        var (badge, _, tooltip) = hovered[0];
+
+        var separator = tooltip.IndexOf('|');
+        var heading = tooltip[..separator];
+        var lines = Wrap(tooltip[(separator + 1)..], 34, int.MaxValue);
+        const int padding = 12;
+        const int bodySize = 16;
+        var width = 2 * padding + TextAdvance(bodySize) * Math.Max(heading.Length, lines.Max(line => line.Length));
+        var height = 2 * padding + 20 + lines.Length * (bodySize + 4);
+        // Show it beside the portrait, level with the badge, so it never covers the portrait.
+        var y = Math.Clamp(badge.Center.Y - height / 2, 8, layoutHeight - height - 8);
+        var bounds = new Rectangle(Math.Max(badge.Right, HeroPortraitBounds().Right) + 10, y, width, height);
+        if (bounds.Intersects(DeckCounterBounds()) && badge != DeckCounterBounds())
+        {
+            // Keep the tooltip from covering the Deck counter.
+            bounds.X = DeckCounterBounds().Right + 10;
+        }
+        Box(bounds, new Color(19, 34, 43), new Color(73, 110, 120));
+        Text(heading, bounds.X + padding, bounds.Y + padding, 15, Teal);
+        for (var i = 0; i < lines.Length; i++)
+        {
+            Text(lines[i], bounds.X + padding, bounds.Y + padding + 20 + i * (bodySize + 4), bodySize, Ivory);
         }
     }
 
@@ -845,8 +1085,6 @@ internal sealed class BoardUI
 
     private void DrawHand()
     {
-        Text("YOUR HAND", 28, layoutHeight - 163, 14, Muted);
-        Text("Hover to reveal / Right-click for details", 28, layoutHeight - 143, 15, Muted);
         for (var i = 0; i < own.HandCount; i++)
         {
             if (i != hoveredHand && !(handDrag is { Started: true } drag && drag.Slot == i))
