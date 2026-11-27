@@ -49,7 +49,8 @@ internal sealed class TitleReveal : IDisposable
             }
 
             var dark = TitleBurn.Ramp(0f, 0.43f, revealTime) * (1f - TitleBurn.Ramp(1.65f, 4.05f, revealTime));
-            var shade = new Rectangle(bounds.Center.X - 480, bounds.Center.Y - 289, 960, 588);
+            var shadeWidth = Math.Max(960, bounds.Width + 544);
+            var shade = new Rectangle(bounds.Center.X - shadeWidth / 2, bounds.Center.Y - 289, shadeWidth, 588);
             batch.Begin(samplerState: SamplerState.LinearClamp,
                 rasterizerState: rasterizer, transformMatrix: transform);
             batch.Draw(glow, shade, Color.Black * (dark * 0.84f));
@@ -78,7 +79,8 @@ internal sealed class TitleReveal : IDisposable
     private void DrawBacklight(SpriteBatch batch, Rectangle bounds, float time)
     {
         var pulse = TitleBurn.Ramp(0.16f, 1.18f, time) * (1f - TitleBurn.Ramp(2.0f, 4.12f, time));
-        var flare = new Rectangle(bounds.Center.X - 264, bounds.Center.Y - 92, 528, 185);
+        var flareWidth = bounds.Width + 112;
+        var flare = new Rectangle(bounds.Center.X - flareWidth / 2, bounds.Center.Y - 92, flareWidth, 185);
         batch.Draw(glow, flare, new Color(100, 168, 255) { A = (byte)(37 * pulse) });
 
         var anchor = new Vector2(bounds.Center.X - 15f + 17f * MathF.Sin(time * 0.92f),

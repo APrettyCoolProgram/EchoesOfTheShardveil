@@ -12,6 +12,7 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
     private const float UltrawideAspectRatio = 21f / 9f;
     private const float SceneBlendHeightFraction = 144f / 1400f;
     private const int SceneBlendSteps = 48;
+    private const float TitleScale = 0.7425f;
 
     /// <summary>Tests the Single player label in the bottom-anchored menu.</summary>
     public bool IsSinglePlayer(Point mouse, Rectangle clientBounds)
@@ -47,8 +48,9 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
             (float)destination.Width / mural.Width,
             (float)destination.Height / mural.Height, 1f)
             * Matrix.CreateTranslation(destination.X, destination.Y, 0f);
-        const int titleWidth = 416;
-        var titleHeight = (int)MathF.Round((float)title.Height / title.Width * titleWidth);
+        // The wordmark is drawn at a fixed scale (about 815 of the mural's 1,672 units wide), so its letters keep their size.
+        var titleWidth = (int)MathF.Round(title.Width * TitleScale);
+        var titleHeight = (int)MathF.Round(title.Height * TitleScale);
         var titleBounds = new Rectangle((mural.Width - titleWidth) / 2, 10, titleWidth, titleHeight);
         var titleTransform = Matrix.CreateScale(
             (float)fitted.Width / mural.Width, (float)fitted.Height / mural.Height, 1f)

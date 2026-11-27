@@ -24,6 +24,13 @@
     <EmbeddedResource Include="Content/MainUI-Theme.wav" LogicalName="MainUI-Theme.wav" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="AppData/**/*"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <ApplicationIcon>Content/EchoesOfTheShardveil.ico</ApplicationIcon>
