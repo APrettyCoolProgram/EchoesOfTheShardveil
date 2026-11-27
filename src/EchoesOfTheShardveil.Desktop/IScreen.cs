@@ -13,7 +13,9 @@ internal enum ScreenTransition
     None,
     /// <summary>Start a duel.</summary>
     OpenBoard,
-    /// <summary>Close the duel and show the menu.</summary>
+    /// <summary>Open the deck editor.</summary>
+    OpenDeckbuilder,
+    /// <summary>Show the main menu again.</summary>
     ReturnToMenu,
     /// <summary>Close the application.</summary>
     ExitGame,

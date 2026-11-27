@@ -1,0 +1,220 @@
+{
+  "name": "Alpha",
+  "cards": [
+    {
+      "id": "ember-pup",
+      "name": "Ember Pup",
+      "type": "Unit",
+      "cost": 1,
+      "power": 2,
+      "health": 1,
+      "subtype": "Beast",
+      "aspect": null,
+      "keywords": "Rush",
+      "abilities": []
+    },
+    {
+      "id": "lantern-squire",
+      "name": "Lantern Squire",
+      "type": "Unit",
+      "cost": 2,
+      "power": 2,
+      "health": 3,
+      "subtype": "Knight",
+      "aspect": null,
+      "keywords": "Sentinel",
+      "abilities": []
+    },
+    {
+      "id": "mistwing-scout",
+      "name": "Mistwing Scout",
+      "type": "Unit",
+      "cost": 2,
+      "power": 2,
+      "health": 2,
+      "subtype": "Bird",
+      "aspect": null,
+      "keywords": "Elusive",
+      "abilities": []
+    },
+    {
+      "id": "bramble-warden",
+      "name": "Bramble Warden",
+      "type": "Unit",
+      "cost": 3,
+      "power": 2,
+      "health": 4,
+      "subtype": "Plant",
+      "aspect": null,
+      "keywords": "None",
+      "abilities": [
+        {
+          "trigger": "Arrival",
+          "target": "Controller",
+          "action": "HealLeader",
+          "amount": 3,
+          "cost": 0
+        }
+      ]
+    },
+    {
+      "id": "wandering-oathsworn",
+      "name": "Wandering Oathsworn",
+      "type": "Unit",
+      "cost": 4,
+      "power": 4,
+      "health": 4,
+      "subtype": "Knight",
+      "aspect": null,
+      "keywords": "Vigilant",
+      "abilities": []
+    },
+    {
+      "id": "gravebloom",
+      "name": "Gravebloom",
+      "type": "Unit",
+      "cost": 3,
+      "power": 3,
+      "health": 2,
+      "subtype": "Spirit",
+      "aspect": null,
+      "keywords": "None",
+      "abilities": [
+        {
+          "trigger": "LastBreath",
+          "target": "Controller",
+          "action": "Draw",
+          "amount": 1,
+          "cost": 0
+        }
+      ]
+    },
+    {
+      "id": "tusked-charger",
+      "name": "Tusked Charger",
+      "type": "Unit",
+      "cost": 5,
+      "power": 5,
+      "health": 4,
+      "subtype": "Beast",
+      "aspect": null,
+      "keywords": "Pierce",
+      "abilities": []
+    },
+    {
+      "id": "spark-bolt",
+      "name": "Spark Bolt",
+      "type": "Spell",
+      "cost": 2,
+      "power": 0,
+      "health": 0,
+      "subtype": null,
+      "aspect": null,
+      "keywords": "None",
+      "abilities": [
+        {
+          "trigger": "Spell",
+          "target": "ChosenUnit",
+          "action": "Damage",
+          "amount": 3,
+          "cost": 0
+        }
+      ]
+    },
+    {
+      "id": "second-wind",
+      "name": "Second Wind",
+      "type": "Spell",
+      "cost": 1,
+      "power": 0,
+      "health": 0,
+      "subtype": null,
+      "aspect": null,
+      "keywords": "None",
+      "abilities": [
+        {
+          "trigger": "Spell",
+          "target": "FriendlyUnit",
+          "action": "Ready",
+          "amount": 1,
+          "cost": 0
+        },
+        {
+          "trigger": "Spell",
+          "target": "Controller",
+          "action": "Draw",
+          "amount": 1,
+          "cost": 0
+        }
+      ]
+    },
+    {
+      "id": "beacon-of-tides",
+      "name": "Beacon of Tides",
+      "type": "Relic",
+      "cost": 3,
+      "power": 0,
+      "health": 0,
+      "subtype": null,
+      "aspect": null,
+      "keywords": "None",
+      "abilities": [
+        {
+          "trigger": "StartTurn",
+          "target": "RandomFriendlyUnit",
+          "action": "IncreasePower",
+          "amount": 1,
+          "cost": 0
+        }
+      ]
+    },
+    {
+      "id": "gate-watch",
+      "name": "Gate Watch",
+      "type": "Unit",
+      "cost": 1,
+      "power": 1,
+      "health": 2,
+      "subtype": "Knight",
+      "aspect": null,
+      "keywords": "None",
+      "abilities": []
+    },
+    {
+      "id": "mire-runner",
+      "name": "Mire Runner",
+      "type": "Unit",
+      "cost": 2,
+      "power": 3,
+      "health": 2,
+      "subtype": "Beast",
+      "aspect": null,
+      "keywords": "None",
+      "abilities": []
+    },
+    {
+      "id": "hollow-bat",
+      "name": "Hollow Bat",
+      "type": "Unit",
+      "cost": 3,
+      "power": 3,
+      "health": 3,
+      "subtype": "Beast",
+      "aspect": null,
+      "keywords": "Drain",
+      "abilities": []
+    },
+    {
+      "id": "rampart-golem",
+      "name": "Rampart Golem",
+      "type": "Unit",
+      "cost": 4,
+      "power": 4,
+      "health": 5,
+      "subtype": "Construct",
+      "aspect": null,
+      "keywords": "None",
+      "abilities": []
+    }
+  ]
+}

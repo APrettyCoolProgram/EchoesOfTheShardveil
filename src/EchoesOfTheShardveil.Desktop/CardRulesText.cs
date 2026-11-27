@@ -1,6 +1,7 @@
 // 261127_code
 // 261127_documentation
 
+using System.Globalization;
 using EchoesOfTheShardveil.Core;
 
 namespace EchoesOfTheShardveil.Desktop;
@@ -8,16 +9,23 @@ namespace EchoesOfTheShardveil.Desktop;
 /// <summary>Turns a card's rules data into player-facing text.</summary>
 internal static class CardRulesText
 {
+    private static readonly CardKeyword[] Keywords = Enum.GetValues<CardKeyword>()
+        .Where(keyword => keyword != CardKeyword.None).ToArray();
+    private static readonly Lazy<Dictionary<string, KeywordText>> Catalog = new(LoadKeywords);
+
     /// <summary>Writes the full rules of a card for the inspector.</summary>
     /// <param name="card">The card to describe.</param>
     /// <returns>One sentence for each keyword, followed by one for each ability.</returns>
     public static IEnumerable<string> Describe(CardDefinition card)
     {
-        foreach (var keyword in Enum.GetValues<CardKeyword>())
+        foreach (var keyword in Keywords)
         {
-            if (keyword != CardKeyword.None && card.HasKeyword(keyword))
+            if (card.HasKeyword(keyword))
             {
-                yield return $"{keyword} - {KeywordRule(keyword)}";
+                var text = Catalog.Value[keyword.ToString()];
+                var reminder = text.ReminderText.Replace("{startingHealth}", MatchFormats.Alpha.StartingHealth.ToString(CultureInfo.InvariantCulture),
+                    StringComparison.Ordinal);
+                yield return $"{text.Name} - {reminder}";
             }
         }
 
@@ -38,7 +46,8 @@ internal static class CardRulesText
     {
         if (card.Keywords != CardKeyword.None)
         {
-            return card.Keywords.ToString();
+            return string.Join(", ", Keywords.Where(card.HasKeyword)
+                .Select(keyword => Catalog.Value[keyword.ToString()].Name));
         }
         if (card.Abilities.Count == 0)
         {
@@ -57,19 +66,27 @@ internal static class CardRulesText
         };
     }
 
-    /// <summary>Explains a keyword.</summary>
-    /// <param name="keyword">A single keyword.</param>
-    /// <returns>The rule, or an empty string.</returns>
-    private static string KeywordRule(CardKeyword keyword) => keyword switch
+    /// <summary>Reads the display catalog and checks that every engine keyword has an entry.</summary>
+    /// <returns>The catalog keyed by the engine keyword ID.</returns>
+    private static Dictionary<string, KeywordText> LoadKeywords()
     {
-        CardKeyword.Rush => "Can attack on the turn it enters play.",
-        CardKeyword.Vigilant => "Stays ready after attacking.",
-        CardKeyword.Sentinel => "Can intercept while exhausted.",
-        CardKeyword.Elusive => "Only Elusive Units can intercept its attacks.",
-        CardKeyword.Pierce => "Excess combat damage hits the Opponent.",
-        CardKeyword.Drain => $"Restores your Hero by the damage dealt, up to {Duel.StartingHealth} Health.",
-        _ => "",
-    };
+        var path = AppDataJson.PathFor("Rule", "Keyword.json");
+        var catalog = AppDataJson.Load<Dictionary<string, KeywordText>>(path);
+        foreach (var keyword in Keywords)
+        {
+            if (!catalog.TryGetValue(keyword.ToString(), out var text) || text is null ||
+                string.IsNullOrWhiteSpace(text.Name) || string.IsNullOrWhiteSpace(text.ReminderText))
+            {
+                throw new InvalidDataException($"'{path}' is missing display text for '{keyword}'.");
+            }
+        }
+        return catalog;
+    }
+
+    /// <summary>The player-facing text for one keyword.</summary>
+    /// <param name="Name">The display name.</param>
+    /// <param name="ReminderText">The rule reminder shown in the inspector.</param>
+    private sealed record KeywordText(string Name, string ReminderText);
 
     /// <summary>Explains an ability, including when it resolves.</summary>
     /// <param name="ability">The ability.</param>
@@ -96,7 +113,7 @@ internal static class CardRulesText
         var action = ability.Action switch
         {
             AbilityAction.Damage => $"Deal {amount} damage to {target}.",
-            AbilityAction.HealLeader => $"Restore {amount} Health to your Hero, up to {Duel.StartingHealth}.",
+            AbilityAction.HealLeader => $"Restore {amount} Health to your Hero, up to {MatchFormats.Alpha.StartingHealth}.",
             AbilityAction.Draw => amount == 1 ? "Draw a card." : $"Draw {amount} cards.",
             AbilityAction.Ready => $"Ready {target}.",
             AbilityAction.IncreasePower => $"Give {target} +{amount} Power permanently.",

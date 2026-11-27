@@ -9,10 +9,10 @@ namespace EchoesOfTheShardveil.Core;
 /// <summary>Runs a deterministic two-player Alpha.02 duel when supplied with a seed.</summary>
 public sealed class Duel
 {
-    /// <summary>The Health each player starts with, and the most healing can restore.</summary>
+    /// <summary>The default starting Health and healing cap.</summary>
     public const int StartingHealth = 20;
 
-    /// <summary>The exact number of cards a deck must contain.</summary>
+    /// <summary>The default required deck size.</summary>
     public const int DeckSize = 40;
 
     /// <summary>The number of cards dealt to each player before the mulligan.</summary>
@@ -30,8 +30,12 @@ public sealed class Duel
     /// <summary>The most shards a Well can hold. No card or ability can cost more.</summary>
     public const int WellLimit = 10;
 
-    private const int MaxCopiesPerName = 3;
+    /// <summary>The default copy limit for each card name.</summary>
+    public const int MaxCopiesPerName = 3;
 
+    private static readonly DuelFormat DefaultFormat = new(StartingHealth, DeckSize, MaxCopiesPerName);
+
+    private readonly DuelFormat format;
     private readonly Player[] players;
     private readonly Random random;
     private readonly int firstPlayer;
@@ -40,16 +44,17 @@ public sealed class Duel
     /// <param name="playerOneDeck">The deck of the player at index 0.</param>
     /// <param name="playerTwoDeck">The deck of the player at index 1.</param>
     /// <param name="seed">The random seed, or <see langword="null"/> for an unpredictable duel.</param>
-    /// <exception cref="ArgumentException">
-    /// Thrown when a deck does not have <see cref="DeckSize"/> valid playable cards with at most three of each name.
-    /// </exception>
-    public Duel(IEnumerable<CardDefinition> playerOneDeck, IEnumerable<CardDefinition> playerTwoDeck, int? seed = null)
+    /// <param name="format">The match limits, or <see langword="null"/> for the default format.</param>
+    /// <exception cref="ArgumentException">A deck contains invalid cards or violates the format limits.</exception>
+    public Duel(IEnumerable<CardDefinition> playerOneDeck, IEnumerable<CardDefinition> playerTwoDeck,
+        int? seed = null, DuelFormat? format = null)
     {
+        this.format = format ?? DefaultFormat;
         random = seed is int value ? new Random(value) : new Random();
         players =
         [
-            new(new("leader-one", "Leader One") { Type = CardType.Leader }, ValidateDeck(playerOneDeck)),
-            new(new("leader-two", "Leader Two") { Type = CardType.Leader }, ValidateDeck(playerTwoDeck)),
+            new(new("leader-one", "Leader One") { Type = CardType.Leader }, ValidateDeck(playerOneDeck), this.format.StartingHealth),
+            new(new("leader-two", "Leader Two") { Type = CardType.Leader }, ValidateDeck(playerTwoDeck), this.format.StartingHealth),
         ];
         firstPlayer = random.Next(players.Length);
         ActivePlayer = firstPlayer;
@@ -502,11 +507,11 @@ public sealed class Duel
     /// <summary>Restores Health, up to the starting Health. A player at 0 cannot be healed.</summary>
     /// <param name="player">The player.</param>
     /// <param name="amount">The Health to restore.</param>
-    private static void HealLeader(Player player, int amount)
+    private void HealLeader(Player player, int amount)
     {
         if (player.Health > 0)
         {
-            player.Health = Math.Min(StartingHealth, player.Health + amount);
+            player.Health = (int)Math.Min(format.StartingHealth, (long)player.Health + amount);
         }
     }
 
@@ -760,17 +765,17 @@ public sealed class Duel
     /// <param name="deck">The cards supplied by the caller.</param>
     /// <returns>A copy the duel can change freely.</returns>
     /// <exception cref="ArgumentException">Thrown when the deck breaks a rule.</exception>
-    private static List<CardDefinition> ValidateDeck(IEnumerable<CardDefinition> deck)
+    private List<CardDefinition> ValidateDeck(IEnumerable<CardDefinition> deck)
     {
         var cards = deck.ToList();
-        if (cards.Count != DeckSize ||
+        if (cards.Count != format.DeckSize ||
             cards.Any(card => card.Type is not (CardType.Unit or CardType.Spell or CardType.Relic)
                 || card.Cost is < 0 or > WellLimit || (card.Type == CardType.Unit && (card.Power < 0 || card.Health <= 0))
                 || card.Abilities.Any(ability => ability.Amount < 0 || ability.Cost is < 0 or > WellLimit)) ||
             cards.GroupBy(card => card.Name, StringComparer.OrdinalIgnoreCase)
-                .Any(group => group.Count() > MaxCopiesPerName))
+                .Any(group => group.Count() > format.MaxCopiesPerName))
         {
-            throw new ArgumentException($"A deck needs {DeckSize} valid playable cards, with at most three of each name.",
+            throw new ArgumentException($"A deck needs {format.DeckSize} valid playable cards, with at most {format.MaxCopiesPerName} of each name.",
                 nameof(deck));
         }
         // Copy the ability lists so a caller cannot change the cards of a running duel.
@@ -792,7 +797,8 @@ public sealed class Duel
     /// <summary>The mutable state of one side of the duel.</summary>
     /// <param name="leader">The player's Leader card.</param>
     /// <param name="deck">The validated deck, with its top card last.</param>
-    private sealed class Player(CardDefinition leader, List<CardDefinition> deck)
+    /// <param name="startingHealth">The starting Health from the match format.</param>
+    private sealed class Player(CardDefinition leader, List<CardDefinition> deck, int startingHealth)
     {
         /// <summary>Gets the player's Leader card.</summary>
         public CardDefinition Leader { get; } = leader;
@@ -816,7 +822,7 @@ public sealed class Duel
         public CardDefinition?[] Relics { get; } = new CardDefinition?[RelicSlots];
 
         /// <summary>Gets or sets the remaining Health.</summary>
-        public int Health { get; set; } = StartingHealth;
+        public int Health { get; set; } = startingHealth;
 
         /// <summary>Gets or sets the shards not yet spent this turn.</summary>
         public int ReadyShards { get; set; }

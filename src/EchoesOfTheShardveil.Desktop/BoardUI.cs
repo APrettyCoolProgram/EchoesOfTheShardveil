@@ -34,12 +34,13 @@ internal sealed partial class BoardUI : IDisposable
     private readonly Texture2D blankBadge;
     private readonly Texture2D[] counterDigits;
     private readonly HashSet<int> mulliganSlots = [];
-    private readonly float[] handLift = new float[Duel.DeckSize];
+    private readonly float[] handLift = new float[MatchFormats.Alpha.DeckSize];
     private int hoveredHand = -1;
     private CardDefinition? inspectedCard;
     private string[] inspectorRows = [];
     private int inspectorScroll;
     private BoardTutorial tutorial = new();
+    private readonly IReadOnlyList<CardDefinition> playerDeck;
     private Duel duel;
     private PlayerView humanView;
     private PlayerView opponentView;
@@ -62,9 +63,11 @@ internal sealed partial class BoardUI : IDisposable
     /// <param name="heroPlaymat">The background of the lower half.</param>
     /// <param name="opponentPortrait">The framed Opponent portrait.</param>
     /// <param name="opponentPlaymat">The background of the upper half.</param>
+    /// <param name="playerDeck">The active player deck, or null to use the starter deck.</param>
     public BoardUI(SpriteBatch spriteBatch, Texture2D pixel, Texture2D font,
         Texture2D heroPortrait, Texture2D healthAtlas, Texture2D heroDropRing, Texture2D blankBadge,
-        Texture2D counterDigitSheet, Texture2D heroPlaymat, Texture2D opponentPortrait, Texture2D opponentPlaymat)
+        Texture2D counterDigitSheet, Texture2D heroPlaymat, Texture2D opponentPortrait, Texture2D opponentPlaymat,
+        IReadOnlyList<CardDefinition>? playerDeck = null)
     {
         this.spriteBatch = spriteBatch;
         this.pixel = pixel;
@@ -77,6 +80,7 @@ internal sealed partial class BoardUI : IDisposable
         this.heroDropRing = heroDropRing;
         this.blankBadge = blankBadge;
         counterDigits = CounterDigits.Build(counterDigitSheet, CounterDigitHeight);
+        this.playerDeck = playerDeck ?? StarterDecks.Create();
         duel = NewDuel();
         humanView = duel.View(Human, Human);
         opponentView = duel.View(Opponent, Human);
@@ -242,9 +246,9 @@ internal sealed partial class BoardUI : IDisposable
 
     /// <summary>Creates a duel against the computer, which always keeps its opening hand.</summary>
     /// <returns>The duel, waiting for the human's mulligan.</returns>
-    private static Duel NewDuel()
+    private Duel NewDuel()
     {
-        var match = new Duel(StarterDecks.Create(), StarterDecks.Create(secondDeck: true));
+        var match = new Duel(playerDeck, StarterDecks.Create(secondDeck: true), format: MatchFormats.Alpha);
         // The computer always keeps its opening hand.
         match.Mulligan(Opponent, []);
         return match;

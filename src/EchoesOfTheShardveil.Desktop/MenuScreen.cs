@@ -75,9 +75,9 @@ internal sealed class MenuScreen : IScreen
             {
                 return ScreenTransition.ExitGame;
             }
-            if (action == WindowControlResult.Ignored && mainUI.IsOverSinglePlayer(frame.Pointer, client))
+            if (action == WindowControlResult.Ignored)
             {
-                return ScreenTransition.OpenBoard;
+                return mainUI.MenuSelection(frame.Pointer, client);
             }
         }
 

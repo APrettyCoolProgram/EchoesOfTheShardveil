@@ -1,6 +1,7 @@
 // 261127_code
 // 261127_documentation
 
+using EchoesOfTheShardveil.Core;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -26,7 +27,8 @@ internal sealed class BoardScreen : IScreen
 
     /// <summary>Loads the board artwork and starts a duel.</summary>
     /// <param name="services">The shared graphics and audio.</param>
-    public BoardScreen(GameServices services)
+    /// <param name="playerDeck">The active player deck, or null to use the starter deck.</param>
+    public BoardScreen(GameServices services, IReadOnlyList<CardDefinition>? playerDeck = null)
     {
         this.services = services;
         var device = services.Device;
@@ -41,7 +43,7 @@ internal sealed class BoardScreen : IScreen
         blankBadge = CircleTexture.Create(device, BoardUI.BadgeSize, borderWidth: 1, Color.Black);
         using var digitSheet = EmbeddedAssets.LoadTexture(device, "Counter-Digits.png");
         board = new BoardUI(services.SpriteBatch, services.Pixel, services.Font, heroPortrait, healthAtlas,
-            heroDropRing, blankBadge, digitSheet, heroPlaymat, opponentPortrait, opponentPlaymat);
+            heroDropRing, blankBadge, digitSheet, heroPlaymat, opponentPortrait, opponentPlaymat, playerDeck);
     }
 
     /// <inheritdoc />

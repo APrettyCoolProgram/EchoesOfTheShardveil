@@ -1,0 +1,26 @@
+{
+  "Rush": {
+    "name": "Rush",
+    "reminderText": "Can attack on the turn it enters play."
+  },
+  "Vigilant": {
+    "name": "Vigilant",
+    "reminderText": "Stays ready after attacking."
+  },
+  "Sentinel": {
+    "name": "Sentinel",
+    "reminderText": "Can intercept while exhausted."
+  },
+  "Elusive": {
+    "name": "Elusive",
+    "reminderText": "Only Elusive Units can intercept its attacks."
+  },
+  "Pierce": {
+    "name": "Pierce",
+    "reminderText": "Excess combat damage hits the Opponent."
+  },
+  "Drain": {
+    "name": "Drain",
+    "reminderText": "Restores your Hero by the damage dealt, up to {startingHealth} Health."
+  }
+}

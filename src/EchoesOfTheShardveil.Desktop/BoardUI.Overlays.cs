@@ -30,7 +30,7 @@ internal sealed partial class BoardUI
         new("REMOVED", "Cards removed from the game. They can't return. No cards use this yet.");
 
     private static readonly CardDefinition TutorialUnit =
-        StarterDecks.Create().First(card => card.Id == "mistwing-scout");
+        StarterDecks.GetCard("mistwing-scout");
 
     /// <summary>Draws help for the badge or counter under the pointer.</summary>
     private void DrawBadgeTooltip()

@@ -15,7 +15,8 @@ internal sealed class CardGame : Game
     private DesktopDrawable? drawable;
     private QuitWatcher? quitWatcher;
     private MenuScreen? menu;
-    private BoardScreen? board;
+    private DeckbuilderUI? deckbuilder;
+    private IScreen? currentScreen;
     private bool exitConfirmed;
 
     /// <summary>Initializes the game with a resizable window at the board's design size.</summary>
@@ -31,9 +32,6 @@ internal sealed class CardGame : Game
         IsMouseVisible = true;
     }
 
-    /// <summary>Gets the screen being shown: the board during a duel, otherwise the menu.</summary>
-    private IScreen? CurrentScreen => (IScreen?)board ?? menu;
-
     protected override void LoadContent()
     {
         var spriteBatch = new SpriteBatch(GraphicsDevice);
@@ -44,13 +42,13 @@ internal sealed class CardGame : Game
         drawable = new DesktopDrawable();
         quitWatcher = new QuitWatcher();
         menu = new MenuScreen(services);
-        Window.Title = menu.Title;
+        Show(menu);
         audio.Start();
     }
 
     protected override void Update(GameTime gameTime)
     {
-        if (CurrentScreen is { } screen)
+        if (currentScreen is { } screen)
         {
             var client = drawable?.Synchronize(GraphicsDevice, Window) ?? Window.ClientBounds;
             Apply(screen.Update(gameTime, client, IsActive));
@@ -68,7 +66,7 @@ internal sealed class CardGame : Game
         }
 
         // The window's close button asks first: the menu offers to quit, the board offers to forfeit.
-        if (!exitConfirmed && CurrentScreen is { } screen)
+        if (!exitConfirmed && currentScreen is { } screen)
         {
             args.Cancel = true;
             screen.RequestClose();
@@ -77,7 +75,7 @@ internal sealed class CardGame : Game
 
     protected override void Draw(GameTime gameTime)
     {
-        CurrentScreen?.Draw(gameTime);
+        currentScreen?.Draw(gameTime);
         base.Draw(gameTime);
     }
 
@@ -85,7 +83,11 @@ internal sealed class CardGame : Game
     {
         if (disposing)
         {
-            board?.Dispose();
+            if (currentScreen is BoardScreen board)
+            {
+                board.Dispose();
+            }
+            deckbuilder?.Dispose();
             menu?.Dispose();
             audio.Dispose();
             services?.Font.Dispose();
@@ -97,6 +99,14 @@ internal sealed class CardGame : Game
         base.Dispose(disposing);
     }
 
+    /// <summary>Activates a screen and applies its window title.</summary>
+    /// <param name="screen">The screen to show.</param>
+    private void Show(IScreen screen)
+    {
+        currentScreen = screen;
+        Window.Title = screen.Title;
+    }
+
     /// <summary>Carries out what a screen asked for.</summary>
     /// <param name="transition">The requested change.</param>
     private void Apply(ScreenTransition transition)
@@ -104,14 +114,20 @@ internal sealed class CardGame : Game
         switch (transition)
         {
             case ScreenTransition.OpenBoard when services is not null:
-                board = new BoardScreen(services);
-                Window.Title = board.Title;
+                Show(new BoardScreen(services, deckbuilder?.ActiveDeck));
                 break;
-            case ScreenTransition.ReturnToMenu when board is not null && menu is not null:
-                board.Dispose();
-                board = null;
+            case ScreenTransition.OpenDeckbuilder when services is not null:
+                deckbuilder ??= new DeckbuilderUI(services);
+                deckbuilder.Activate();
+                Show(deckbuilder);
+                break;
+            case ScreenTransition.ReturnToMenu when menu is not null:
+                if (currentScreen is BoardScreen board)
+                {
+                    board.Dispose();
+                }
                 menu.Activate();
-                Window.Title = menu.Title;
+                Show(menu);
                 break;
             case ScreenTransition.ExitGame:
                 exitConfirmed = true;

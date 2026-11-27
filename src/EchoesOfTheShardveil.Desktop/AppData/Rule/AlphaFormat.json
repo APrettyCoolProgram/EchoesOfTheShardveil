@@ -1,0 +1,5 @@
+{
+  "startingHealth": 20,
+  "deckSize": 40,
+  "maxCopiesPerName": 3
+}

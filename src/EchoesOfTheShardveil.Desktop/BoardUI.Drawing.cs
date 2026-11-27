@@ -13,7 +13,7 @@ internal sealed partial class BoardUI
 {
     // The badge atlas is a grid of numbered badges from 0 to the starting Health.
     private const int HealthAtlasColumns = 6;
-    private const int HealthAtlasCount = Duel.StartingHealth + 1;
+    private const int HealthAtlasCount = 21;
 
     /// <summary>The color behind the board.</summary>
     public static readonly Color BackgroundColor = new(12, 21, 27);

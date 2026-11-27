@@ -27,20 +27,29 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
     private const int SceneBlendSteps = 48;
     private const float TitleScale = 0.7425f;
 
-    /// <summary>Tests the Single player label in the bottom-anchored menu.</summary>
+    /// <summary>Finds the screen selected in the bottom-anchored menu.</summary>
     /// <param name="mouse">The mouse position in client units.</param>
     /// <param name="clientBounds">The window's client size in mouse units.</param>
-    /// <returns><see langword="true"/> if the mouse is over the label.</returns>
-    public bool IsOverSinglePlayer(Point mouse, Rectangle clientBounds)
+    /// <returns>The requested screen, or no transition if the pointer is outside the supported labels.</returns>
+    public ScreenTransition MenuSelection(Point mouse, Rectangle clientBounds)
     {
         var viewport = graphicsDevice.Viewport;
         var fitted = ScreenLayout.Fit(viewport, mural.Width, mural.Height);
         var menuBounds = ScreenLayout.BottomOverlay(viewport, fitted, mural.Height, menuBar.Height);
         // The label's position is in the menu artwork's own pixels.
-        return ScreenLayout.TryMap(mouse, clientBounds, viewport, menuBounds,
-            menuBar.Width, menuBar.Height, out var position)
-            && new Rectangle((menuBar.Width + MenuItemSpacing) / 2 - 120, 24, 240, 78)
-                .Contains(position);
+        if (!ScreenLayout.TryMap(mouse, clientBounds, viewport, menuBounds,
+            menuBar.Width, menuBar.Height, out var position))
+        {
+            return ScreenTransition.None;
+        }
+
+        var deckbuilder = new Rectangle((menuBar.Width - MenuItemSpacing) / 2 - 120, 24, 240, 78);
+        var singlePlayer = new Rectangle((menuBar.Width + MenuItemSpacing) / 2 - 120, 24, 240, 78);
+        if (deckbuilder.Contains(position))
+        {
+            return ScreenTransition.OpenDeckbuilder;
+        }
+        return singlePlayer.Contains(position) ? ScreenTransition.OpenBoard : ScreenTransition.None;
     }
 
     /// <summary>Fills the viewport with the mural and anchors the logo and menu to the window edges.</summary>

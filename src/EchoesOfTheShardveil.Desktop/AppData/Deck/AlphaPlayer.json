@@ -1,0 +1,19 @@
+{
+  "set": "Alpha",
+  "cards": [
+    { "id": "ember-pup", "copies": 3 },
+    { "id": "lantern-squire", "copies": 3 },
+    { "id": "mistwing-scout", "copies": 2 },
+    { "id": "bramble-warden", "copies": 3 },
+    { "id": "wandering-oathsworn", "copies": 3 },
+    { "id": "gravebloom", "copies": 3 },
+    { "id": "tusked-charger", "copies": 2 },
+    { "id": "spark-bolt", "copies": 3 },
+    { "id": "second-wind", "copies": 3 },
+    { "id": "beacon-of-tides", "copies": 3 },
+    { "id": "gate-watch", "copies": 3 },
+    { "id": "mire-runner", "copies": 3 },
+    { "id": "hollow-bat", "copies": 3 },
+    { "id": "rampart-golem", "copies": 3 }
+  ]
+}

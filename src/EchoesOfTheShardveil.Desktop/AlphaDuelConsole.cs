@@ -14,7 +14,7 @@ internal static class AlphaDuelConsole
     /// <summary>Plays one duel in the console until it ends or the input is closed.</summary>
     public static void Run()
     {
-        var duel = new Duel(StarterDecks.Create(), StarterDecks.Create(secondDeck: true));
+        var duel = new Duel(StarterDecks.Create(), StarterDecks.Create(secondDeck: true), format: MatchFormats.Alpha);
         Console.WriteLine("Echoes of the Shardveil • Alpha.02 hot-seat duel");
         if (!ChooseOpeningHands(duel) || !PlayTurns(duel))
         {
