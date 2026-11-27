@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Last updated 260713
 https://gist.github.com/APrettyCoolProgram/db5b7708c9ca236f3668bd39a036e1fe
 -->
@@ -27,5 +27,9 @@ Use the **Applies to** column to determine which agent should handle a given fil
 @./.github/agents/AGENT-CSharp-XmlDocumentation.md
 
 ---
+
+## Character artwork
+
+All character images under AppData/Character, including new and revised .front, .side, and .portrait assets, must use a transparent PNG background. Verify the alpha channel before saving.
 
 *END OF AGENTS.md*
