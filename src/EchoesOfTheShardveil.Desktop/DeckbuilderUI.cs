@@ -65,7 +65,7 @@ internal sealed class DeckbuilderUI : IScreen
     private int MaximumOffset => Math.Max(0, cards.Length - VisibleRows);
     private int VisibleEnd => Math.Min(firstVisible + VisibleRows, cards.Length);
     private int CardCount => copies.Sum();
-    private bool CanApply => CardCount == MatchFormats.Alpha.DeckSize && !copies.SequenceEqual(activeCopies);
+    private bool CanApply => CardCount == MatchFormats.Active.DeckSize && !copies.SequenceEqual(activeCopies);
 
     /// <summary>Ignores the click that opened the editor from the menu.</summary>
     public void Activate()
@@ -141,10 +141,10 @@ internal sealed class DeckbuilderUI : IScreen
         DrawDetails();
         Box(Deck, Panel);
         Text("Your deck", 734, 534, 29, UiColors.Ivory);
-        Text($"{CardCount} / {MatchFormats.Alpha.DeckSize} cards", 734, 574, 25, Gold);
+        Text($"{CardCount} / {MatchFormats.Active.DeckSize} cards", 734, 574, 25, Gold);
         Fill(new Rectangle(734, 615, 338, 5), Border);
-        Fill(new Rectangle(734, 615, 338 * CardCount / MatchFormats.Alpha.DeckSize, 5), Gold);
-        Text($"Up to {MatchFormats.Alpha.MaxCopiesPerName} copies per card", 734, 630, 19, Muted);
+        Fill(new Rectangle(734, 615, 338 * CardCount / MatchFormats.Active.DeckSize, 5), Gold);
+        Text($"Up to {MatchFormats.Active.MaxCopiesPerName} copies per card", 734, 630, 19, Muted);
         Text(status, 28, 699, 20, Muted);
         Button(Restore, "Restore starter", true);
         Button(ApplyDeck, "Use this deck", CanApply, primary: true);
@@ -216,9 +216,9 @@ internal sealed class DeckbuilderUI : IScreen
     /// <param name="count">The current draft size.</param>
     /// <returns>Whether another copy can be added.</returns>
     private bool CanAdd(int index, int count) =>
-        count < MatchFormats.Alpha.DeckSize &&
+        count < MatchFormats.Active.DeckSize &&
         copies.Where((_, other) => StringComparer.OrdinalIgnoreCase.Equals(cards[index].Name, cards[other].Name))
-            .Sum() < MatchFormats.Alpha.MaxCopiesPerName;
+            .Sum() < MatchFormats.Active.MaxCopiesPerName;
 
     /// <summary>Resets the draft to the original starter composition.</summary>
     private void RestoreStarter()

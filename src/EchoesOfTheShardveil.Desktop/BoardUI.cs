@@ -34,7 +34,7 @@ internal sealed partial class BoardUI : IDisposable
     private readonly Texture2D blankBadge;
     private readonly Texture2D[] counterDigits;
     private readonly HashSet<int> mulliganSlots = [];
-    private readonly float[] handLift = new float[MatchFormats.Alpha.DeckSize];
+    private readonly float[] handLift = new float[MatchFormats.Active.DeckSize];
     private int hoveredHand = -1;
     private CardDefinition? inspectedCard;
     private string[] inspectorRows = [];
@@ -248,7 +248,7 @@ internal sealed partial class BoardUI : IDisposable
     /// <returns>The duel, waiting for the human's mulligan.</returns>
     private Duel NewDuel()
     {
-        var match = new Duel(playerDeck, StarterDecks.Create(secondDeck: true), format: MatchFormats.Alpha);
+        var match = MatchSetup.CreateDuel(playerDeck);
         // The computer always keeps its opening hand.
         match.Mulligan(Opponent, []);
         return match;

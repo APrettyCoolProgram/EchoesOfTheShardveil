@@ -45,16 +45,26 @@ public sealed class Duel
     /// <param name="playerTwoDeck">The deck of the player at index 1.</param>
     /// <param name="seed">The random seed, or <see langword="null"/> for an unpredictable duel.</param>
     /// <param name="format">The match limits, or <see langword="null"/> for the default format.</param>
-    /// <exception cref="ArgumentException">A deck contains invalid cards or violates the format limits.</exception>
+    /// <param name="playerOneLeader">The first player's Leader, or null for a default identity.</param>
+    /// <param name="playerTwoLeader">The second player's Leader, or null for a default identity.</param>
+    /// <exception cref="ArgumentException">A deck or Leader violates the duel rules.</exception>
     public Duel(IEnumerable<CardDefinition> playerOneDeck, IEnumerable<CardDefinition> playerTwoDeck,
-        int? seed = null, DuelFormat? format = null)
+        int? seed = null, DuelFormat? format = null, CardDefinition? playerOneLeader = null,
+        CardDefinition? playerTwoLeader = null)
     {
+        if (playerOneLeader is { Type: not CardType.Leader } || playerTwoLeader is { Type: not CardType.Leader })
+        {
+            throw new ArgumentException("A duel leader must have the Leader card type.");
+        }
+
         this.format = format ?? DefaultFormat;
         random = seed is int value ? new Random(value) : new Random();
         players =
         [
-            new(new("leader-one", "Leader One") { Type = CardType.Leader }, ValidateDeck(playerOneDeck), this.format.StartingHealth),
-            new(new("leader-two", "Leader Two") { Type = CardType.Leader }, ValidateDeck(playerTwoDeck), this.format.StartingHealth),
+            new(playerOneLeader ?? new("leader-one", "Leader One") { Type = CardType.Leader },
+                ValidateDeck(playerOneDeck), this.format.StartingHealth),
+            new(playerTwoLeader ?? new("leader-two", "Leader Two") { Type = CardType.Leader },
+                ValidateDeck(playerTwoDeck), this.format.StartingHealth),
         ];
         firstPlayer = random.Next(players.Length);
         ActivePlayer = firstPlayer;

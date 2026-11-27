@@ -24,7 +24,7 @@ internal static class CardRulesText
             if (card.HasKeyword(keyword))
             {
                 var text = Catalog.Value[keyword.ToString()];
-                var reminder = text.ReminderText.Replace("{startingHealth}", MatchFormats.Alpha.StartingHealth.ToString(CultureInfo.InvariantCulture),
+                var reminder = text.ReminderText.Replace("{startingHealth}", MatchFormats.Active.StartingHealth.ToString(CultureInfo.InvariantCulture),
                     StringComparison.Ordinal);
                 yield return $"{text.Name} - {reminder}";
             }
@@ -95,7 +95,7 @@ internal static class CardRulesText
         template.Replace("{amount}", ability.Amount.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
             .Replace("{cost}", ability.Cost.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
             .Replace("{target}", Abilities.Value.Targets[ability.Target], StringComparison.Ordinal)
-            .Replace("{startingHealth}", MatchFormats.Alpha.StartingHealth.ToString(CultureInfo.InvariantCulture),
+            .Replace("{startingHealth}", MatchFormats.Active.StartingHealth.ToString(CultureInfo.InvariantCulture),
                 StringComparison.Ordinal);
 
     /// <summary>Reads ability display text and verifies that each engine identifier has a label or template.</summary>

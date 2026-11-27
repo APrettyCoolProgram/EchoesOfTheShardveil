@@ -1,0 +1,15 @@
+{
+  "format": "Rule/AlphaFormat.json",
+  "player": {
+    "deck": "Deck/AlphaPlayer.json",
+    "character": "Character/Hero/Knight/Knight.json",
+    "portrait": "embedded:Board-Hero-Knight.png",
+    "playmat": "embedded:Board-Hero-Knight-Playmat.jpg"
+  },
+  "opponent": {
+    "deck": "Deck/AlphaOpponent.json",
+    "character": "Character/Villain/LichKing/LichKing.json",
+    "portrait": "embedded:Board-Opponent-Lich-King.png",
+    "playmat": "embedded:Board-Opponent-Lich-King-Playmat.jpg"
+  }
+}

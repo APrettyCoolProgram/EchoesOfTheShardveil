@@ -21,6 +21,20 @@ internal static class AppDataJson
     public static string PathFor(params string[] parts) =>
         Path.Combine([AppContext.BaseDirectory, "AppData", .. parts]);
 
+    /// <summary>Resolves an AppData-relative content reference from a configuration file.</summary>
+    /// <param name="reference">A relative path using forward slashes.</param>
+    /// <returns>The absolute path inside AppData.</returns>
+    public static string ResolveReference(string reference)
+    {
+        var parts = reference.Split('/');
+        if (parts.Any(part => string.IsNullOrWhiteSpace(part) || part is "." or ".." ||
+            part.Contains('\\') || part.Contains(':')))
+        {
+            throw new InvalidDataException($"Invalid AppData reference '{reference}'.");
+        }
+        return PathFor(parts);
+    }
+
     /// <summary>Reads a JSON document, reporting its file path if parsing fails.</summary>
     /// <typeparam name="T">The document type.</typeparam>
     /// <param name="path">The path of the data file.</param>

@@ -10,8 +10,6 @@ namespace EchoesOfTheShardveil.Desktop;
 /// <summary>Hosts one single-player duel. A new screen is created for each visit from the menu.</summary>
 internal sealed class BoardScreen : IScreen
 {
-    private const string HeroArtwork = "Board-Hero-Knight";
-    private const string OpponentArtwork = "Board-Opponent-Lich-King";
     private readonly GameServices services;
     private readonly WindowControls controls;
     private readonly Texture2D heroPortrait;
@@ -32,13 +30,14 @@ internal sealed class BoardScreen : IScreen
     {
         this.services = services;
         var device = services.Device;
+        var match = MatchSetup.Current;
         controls = new WindowControls(services.Audio, isBoard: true);
         boardRasterizer = new RasterizerState { ScissorTestEnable = true };
-        heroPortrait = LoadFramedPortrait(device, HeroArtwork + ".png");
-        heroPlaymat = EmbeddedAssets.LoadTexture(device, HeroArtwork + "-Playmat.jpg");
+        heroPortrait = LoadFramedPortrait(device, match.Player.Portrait);
+        heroPlaymat = LoadMatchTexture(device, match.Player.Playmat);
         healthAtlas = EmbeddedAssets.LoadPremultipliedTexture(device, "Board-Hero-Health.png");
-        opponentPortrait = LoadFramedPortrait(device, OpponentArtwork + ".png");
-        opponentPlaymat = EmbeddedAssets.LoadTexture(device, OpponentArtwork + "-Playmat.jpg");
+        opponentPortrait = LoadFramedPortrait(device, match.Opponent.Portrait);
+        opponentPlaymat = LoadMatchTexture(device, match.Opponent.Playmat);
         heroDropRing = CircleTexture.Create(device, BoardUI.HeroPortraitSize + 6, borderWidth: 3, Color.Transparent);
         blankBadge = CircleTexture.Create(device, BoardUI.BadgeSize, borderWidth: 1, Color.Black);
         using var digitSheet = EmbeddedAssets.LoadTexture(device, "Counter-Digits.png");
@@ -132,12 +131,27 @@ internal sealed class BoardScreen : IScreen
 
     /// <summary>Loads a portrait and frames it in a circle.</summary>
     /// <param name="device">The graphics device.</param>
-    /// <param name="name">The embedded image name.</param>
+    /// <param name="reference">The AppData image path or embedded resource reference.</param>
     /// <returns>A texture the caller must dispose.</returns>
-    private static Texture2D LoadFramedPortrait(GraphicsDevice device, string name)
+    private static Texture2D LoadFramedPortrait(GraphicsDevice device, string reference)
     {
-        using var portrait = EmbeddedAssets.LoadPremultipliedTexture(device, name);
+        using var portrait = LoadMatchTexture(device, reference, premultiply: true);
         return CircleTexture.FramePortrait(portrait, BoardUI.HeroPortraitSize, borderWidth: 2);
+    }
+
+    /// <summary>Loads artwork referenced by the matchup from AppData or embedded content.</summary>
+    /// <param name="device">The graphics device.</param>
+    /// <param name="reference">The image path or embedded resource name prefixed with embedded:.</param>
+    /// <param name="premultiply">Whether to premultiply alpha for transparent artwork.</param>
+    /// <returns>The texture owned by the board screen.</returns>
+    private static Texture2D LoadMatchTexture(GraphicsDevice device, string reference, bool premultiply = false)
+    {
+        const string embedded = "embedded:";
+        using var stream = reference.StartsWith(embedded, StringComparison.Ordinal)
+            ? EmbeddedAssets.Open(reference[embedded.Length..])
+            : File.OpenRead(AppDataJson.ResolveReference(reference));
+        return premultiply ? Texture2D.FromStream(device, stream, DefaultColorProcessors.PremultiplyAlpha)
+            : Texture2D.FromStream(device, stream);
     }
 
     /// <summary>

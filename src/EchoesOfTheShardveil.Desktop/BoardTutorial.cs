@@ -67,7 +67,7 @@ internal sealed class BoardTutorial
             throw new InvalidDataException($"The example card in '{path}' must be a playable Unit.");
         }
 
-        var format = MatchFormats.Alpha;
+        var format = MatchFormats.Active;
         var tokens = new (string Token, int Value)[]
         {
             ("{startingHealth}", format.StartingHealth),

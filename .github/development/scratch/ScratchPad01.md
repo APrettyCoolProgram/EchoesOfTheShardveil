@@ -13,8 +13,3 @@ dotnet clean && dotnet build EchoesOfTheShardveil.slnx && dotnet test && dotnet 
 ```
 dotnet clean && dotnet build EchoesOfTheShardveil.slnx && dotnet test && dotnet publish EchoesOfTheShardveil.Desktop/EchoesOfTheShardveil.Desktop.csproj -c Release -r osx-arm64 --self-contained
 ```
-
-alpha.02
-```
-/Users/csb/Repositories/APCP/EchoesOfTheShardveil/src/EchoesOfTheShardveil.Desktop/bin/Release/net11.0/osx-arm64/publish/EchoesOfTheShardveil.Desktop --alpha-duel
-```
