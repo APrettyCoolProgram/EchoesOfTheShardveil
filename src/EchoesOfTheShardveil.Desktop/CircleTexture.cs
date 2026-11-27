@@ -6,22 +6,39 @@ namespace EchoesOfTheShardveil.Desktop;
 /// <summary>Builds antialiased circular textures with a white border.</summary>
 internal static class CircleTexture
 {
+    /// <summary>Crops a square portrait to a circle and adds a border.</summary>
+    /// <param name="portrait">A square texture with premultiplied alpha.</param>
+    /// <param name="displaySize">The size at which the result will be drawn.</param>
+    /// <param name="borderWidth">The border thickness at the display size.</param>
+    /// <returns>A new texture the size of the portrait, which the caller must dispose.</returns>
     public static Texture2D FramePortrait(Texture2D portrait, int displaySize, int borderWidth)
     {
         var size = portrait.Width;
         var source = new Color[size * size];
         portrait.GetData(source);
-        return Upload(portrait.GraphicsDevice, size,
+        return TextureFactory.FromPixels(portrait.GraphicsDevice, size, size,
             Render(size, borderWidth * (float)size / displaySize, Color.Black, source));
     }
 
+    /// <summary>Creates a bordered disc at twice the display size, so it stays smooth when scaled.</summary>
+    /// <param name="device">The graphics device that will own the texture.</param>
+    /// <param name="displaySize">The diameter at which the result will be drawn.</param>
+    /// <param name="borderWidth">The border thickness at the display size.</param>
+    /// <param name="fill">The premultiplied color inside the border.</param>
+    /// <returns>A new texture the caller must dispose.</returns>
     public static Texture2D Create(GraphicsDevice device, int displaySize, int borderWidth, Color fill)
     {
         var size = displaySize * 2;
-        return Upload(device, size, Render(size, borderWidth * 2f, fill, []));
+        return TextureFactory.FromPixels(device, size, size, Render(size, borderWidth * 2f, fill, []));
     }
 
-    internal static Color[] Render(int size, float borderWidth, Color fill, ReadOnlySpan<Color> portrait)
+    /// <summary>Computes the pixels of a bordered, antialiased disc.</summary>
+    /// <param name="size">The width and height in pixels.</param>
+    /// <param name="borderWidth">The thickness of the white border.</param>
+    /// <param name="fill">The color inside the border when there is no portrait.</param>
+    /// <param name="portrait">Square premultiplied pixels to show inside the border, or empty.</param>
+    /// <returns>The pixels in row-major order.</returns>
+    private static Color[] Render(int size, float borderWidth, Color fill, ReadOnlySpan<Color> portrait)
     {
         var pixels = new Color[size * size];
         var radius = size / 2f;
@@ -51,12 +68,5 @@ internal static class CircleTexture
             }
         }
         return pixels;
-    }
-
-    private static Texture2D Upload(GraphicsDevice device, int size, Color[] pixels)
-    {
-        var texture = new Texture2D(device, size, size);
-        texture.SetData(pixels);
-        return texture;
     }
 }

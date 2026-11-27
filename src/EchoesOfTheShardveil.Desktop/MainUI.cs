@@ -4,9 +4,19 @@ using Microsoft.Xna.Framework.Graphics;
 namespace EchoesOfTheShardveil.Desktop;
 
 /// <summary>Draws the startup screen within the game window.</summary>
+/// <param name="graphicsDevice">The graphics device.</param>
+/// <param name="spriteBatch">The sprite batch shared with the effects.</param>
+/// <param name="mural">The main painting.</param>
+/// <param name="sideScenes">The two side panels for ultrawide windows, side by side in one texture.</param>
+/// <param name="sideEffects">The animations on the side panels.</param>
+/// <param name="titleTexture">The wordmark artwork.</param>
+/// <param name="menuBar">The menu artwork along the bottom.</param>
+/// <param name="muralEffects">The animations on the mural.</param>
+/// <param name="titleReveal">The title animation.</param>
+/// <param name="muralRasterizer">A rasterizer state with scissoring enabled.</param>
 internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBatch, Texture2D mural,
-    Texture2D sideScenes, SideSceneEffects sideEffects, Texture2D title, Texture2D menu, MuralEffects effects, TitleReveal reveal,
-    RasterizerState muralRasterizer)
+    Texture2D sideScenes, SideSceneEffects sideEffects, Texture2D titleTexture, Texture2D menuBar,
+    MuralEffects muralEffects, TitleReveal titleReveal, RasterizerState muralRasterizer)
 {
     private const int MenuItemSpacing = 258;
     private const float UltrawideAspectRatio = 21f / 9f;
@@ -15,18 +25,23 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
     private const float TitleScale = 0.7425f;
 
     /// <summary>Tests the Single player label in the bottom-anchored menu.</summary>
-    public bool IsSinglePlayer(Point mouse, Rectangle clientBounds)
+    /// <param name="mouse">The mouse position in client units.</param>
+    /// <param name="clientBounds">The window's client size in mouse units.</param>
+    /// <returns><see langword="true"/> if the mouse is over the label.</returns>
+    public bool IsOverSinglePlayer(Point mouse, Rectangle clientBounds)
     {
         var viewport = graphicsDevice.Viewport;
         var fitted = ScreenLayout.Fit(viewport, mural.Width, mural.Height);
-        var menuBounds = ScreenLayout.BottomOverlay(viewport, fitted, mural.Height, menu.Height);
+        var menuBounds = ScreenLayout.BottomOverlay(viewport, fitted, mural.Height, menuBar.Height);
+        // The label's position is in the menu artwork's own pixels.
         return ScreenLayout.TryMap(mouse, clientBounds, viewport, menuBounds,
-            menu.Width, menu.Height, out var position)
-            && new Rectangle((menu.Width + MenuItemSpacing) / 2 - 120, 24, 240, 78)
+            menuBar.Width, menuBar.Height, out var position)
+            && new Rectangle((menuBar.Width + MenuItemSpacing) / 2 - 120, 24, 240, 78)
                 .Contains(position);
     }
 
     /// <summary>Fills the viewport with the mural and anchors the logo and menu to the window edges.</summary>
+    /// <param name="gameTime">Timing measured from when the menu was shown.</param>
     public void Draw(GameTime gameTime)
     {
         var viewport = graphicsDevice.Viewport;
@@ -49,9 +64,10 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
             (float)destination.Height / mural.Height, 1f)
             * Matrix.CreateTranslation(destination.X, destination.Y, 0f);
         // The wordmark is drawn at a fixed scale (about 815 of the mural's 1,672 units wide), so its letters keep their size.
-        var titleWidth = (int)MathF.Round(title.Width * TitleScale);
-        var titleHeight = (int)MathF.Round(title.Height * TitleScale);
+        var titleWidth = (int)MathF.Round(titleTexture.Width * TitleScale);
+        var titleHeight = (int)MathF.Round(titleTexture.Height * TitleScale);
         var titleBounds = new Rectangle((mural.Width - titleWidth) / 2, 10, titleWidth, titleHeight);
+        // Unlike the mural, the title stays at the top of the window when the mural is cropped.
         var titleTransform = Matrix.CreateScale(
             (float)fitted.Width / mural.Width, (float)fitted.Height / mural.Height, 1f)
             * Matrix.CreateTranslation(fitted.X, 0f, 0f);
@@ -60,14 +76,14 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
         graphicsDevice.ScissorRectangle = viewport.Bounds;
         try
         {
-            effects.Draw(time, muralTransform);
+            muralEffects.Draw(time, muralTransform);
             if (useSideScenes)
             {
                 spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
                 DrawSideScenes(viewport, destination, time);
                 spriteBatch.End();
             }
-            reveal.Draw(spriteBatch, titleBounds, titleTransform, muralRasterizer, time);
+            titleReveal.Draw(spriteBatch, titleBounds, titleTransform, muralRasterizer, time);
         }
         finally
         {
@@ -75,9 +91,13 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
             graphicsDevice.ScissorRectangle = previousScissor;
         }
 
-        DrawMenu(viewport, ScreenLayout.BottomOverlay(viewport, fitted, mural.Height, menu.Height));
+        DrawMenu(viewport, ScreenLayout.BottomOverlay(viewport, fitted, mural.Height, menuBar.Height));
     }
 
+    /// <summary>Draws and animates the two ultrawide side panels, overlapping the mural.</summary>
+    /// <param name="viewport">The window viewport.</param>
+    /// <param name="muralBounds">Where the mural was drawn.</param>
+    /// <param name="time">Seconds since the menu was shown.</param>
     private void DrawSideScenes(Viewport viewport, Rectangle muralBounds, float time)
     {
         var midpoint = sideScenes.Width / 2;
@@ -92,6 +112,14 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
             blendWidth, time, fadeOnLeft: true);
     }
 
+    /// <summary>Draws one side panel, fading the edge that meets the mural.</summary>
+    /// <param name="bounds">The panel's screen area.</param>
+    /// <param name="source">The panel's area of the side artwork.</param>
+    /// <param name="blendWidth">The width of the fade on screen.</param>
+    /// <param name="time">Seconds since the menu was shown.</param>
+    /// <param name="fadeOnLeft">
+    /// <see langword="true"/> for the right panel; <see langword="false"/> for the left panel.
+    /// </param>
     private void DrawSideScene(Rectangle bounds, Rectangle source, int blendWidth, float time, bool fadeOnLeft)
     {
         var scale = Math.Max((float)bounds.Width / source.Width, (float)bounds.Height / source.Height);
@@ -129,6 +157,7 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
         var scaleY = (float)solid.Height / solidSource.Height;
         var transform = Matrix.CreateScale(scaleX, scaleY, 1) * Matrix.CreateTranslation(
             solid.X - solidSource.X * scaleX, solid.Y - solidSource.Y * scaleY, 0);
+        // The right panel fades on its left edge, and the left panel on its right edge.
         if (fadeOnLeft)
         {
             sideEffects.DrawCityLights(spriteBatch, solidSource, transform, time);
@@ -141,19 +170,22 @@ internal sealed class MainUI(GraphicsDevice graphicsDevice, SpriteBatch spriteBa
         }
     }
 
+    /// <summary>Draws the menu bar, stretching its edge columns to the sides of a wider window.</summary>
+    /// <param name="viewport">The window viewport.</param>
+    /// <param name="bounds">The menu bar's area.</param>
     private void DrawMenu(Viewport viewport, Rectangle bounds)
     {
         spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
-        spriteBatch.Draw(menu, bounds, Color.White);
+        spriteBatch.Draw(menuBar, bounds, Color.White);
         if (bounds.Left > 0)
         {
-            spriteBatch.Draw(menu, new Rectangle(0, bounds.Y, bounds.Left, bounds.Height),
-                new Rectangle(0, 0, 1, menu.Height), Color.White);
+            spriteBatch.Draw(menuBar, new Rectangle(0, bounds.Y, bounds.Left, bounds.Height),
+                new Rectangle(0, 0, 1, menuBar.Height), Color.White);
         }
         if (bounds.Right < viewport.Width)
         {
-            spriteBatch.Draw(menu, new Rectangle(bounds.Right, bounds.Y, viewport.Width - bounds.Right, bounds.Height),
-                new Rectangle(menu.Width - 1, 0, 1, menu.Height), Color.White);
+            spriteBatch.Draw(menuBar, new Rectangle(bounds.Right, bounds.Y, viewport.Width - bounds.Right, bounds.Height),
+                new Rectangle(menuBar.Width - 1, 0, 1, menuBar.Height), Color.White);
         }
         spriteBatch.End();
     }

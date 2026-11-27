@@ -2,36 +2,41 @@ using Microsoft.Xna.Framework.Audio;
 
 namespace EchoesOfTheShardveil.Desktop;
 
-/// <summary>Shares the sound preference while keeping playback tied to the active window.</summary>
+/// <summary>Plays the theme music and holds the sound preference shared by every screen.</summary>
 internal sealed class GameAudio : IDisposable
 {
     private SoundEffect? soundtrack;
     private SoundEffectInstance? music;
-    private bool active;
+    private bool isStarted;
 
+    /// <summary>Gets whether the player wants sound.</summary>
     public bool Enabled { get; private set; } = true;
 
+    /// <summary>Begins playback, if sound is enabled and audio hardware is available.</summary>
     public void Start()
     {
-        active = true;
-        Apply();
+        isStarted = true;
+        ApplyPreference();
     }
 
+    /// <summary>Turns sound on or off.</summary>
     public void Toggle()
     {
         Enabled = !Enabled;
-        Apply();
+        ApplyPreference();
     }
 
-    public void Stop()
+    /// <inheritdoc />
+    public void Dispose()
     {
-        active = false;
+        isStarted = false;
         ReleasePlayback();
     }
 
-    private void Apply()
+    /// <summary>Plays or pauses the music to match the preference, loading it when first needed.</summary>
+    private void ApplyPreference()
     {
-        if (!active)
+        if (!isStarted)
         {
             return;
         }
@@ -50,7 +55,7 @@ internal sealed class GameAudio : IDisposable
             ReleasePlayback();
             try
             {
-                using var stream = CardGame.OpenEmbeddedAsset("MainUI-Theme.wav");
+                using var stream = EmbeddedAssets.Open("MainUI-Theme.wav");
                 soundtrack = SoundEffect.FromStream(stream);
                 music = soundtrack.CreateInstance();
                 music.IsLooped = true;
@@ -73,6 +78,7 @@ internal sealed class GameAudio : IDisposable
         }
     }
 
+    /// <summary>Disposes the music and its sound data.</summary>
     private void ReleasePlayback()
     {
         music?.Dispose();
@@ -80,6 +86,4 @@ internal sealed class GameAudio : IDisposable
         soundtrack?.Dispose();
         soundtrack = null;
     }
-
-    public void Dispose() => Stop();
 }

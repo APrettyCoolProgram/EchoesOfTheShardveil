@@ -1,3 +1,4 @@
+using System.Globalization;
 using EchoesOfTheShardveil.Core;
 
 namespace EchoesOfTheShardveil.Desktop;
@@ -5,47 +6,67 @@ namespace EchoesOfTheShardveil.Desktop;
 /// <summary>Provides a local hot-seat playtest without initializing the graphics device.</summary>
 internal static class AlphaDuelConsole
 {
+    private const int PlayerCount = 2;
+
+    /// <summary>Plays one duel in the console until it ends or the input is closed.</summary>
     public static void Run()
     {
         var duel = new Duel(StarterDecks.Create(), StarterDecks.Create(secondDeck: true));
         Console.WriteLine("Echoes of the Shardveil • Alpha.02 hot-seat duel");
-        for (var player = 0; player < 2; player++)
+        if (!ChooseOpeningHands(duel) || !PlayTurns(duel))
+        {
+            return;
+        }
+
+        Console.WriteLine(duel.Outcome switch
+        {
+            DuelOutcome.PlayerOneWins => "Player 1 wins.",
+            DuelOutcome.PlayerTwoWins => "Player 2 wins.",
+            _ => "The duel is a draw.",
+        });
+    }
+
+    /// <summary>Asks each player in turn which cards to exchange.</summary>
+    /// <param name="duel">A duel in setup.</param>
+    /// <returns><see langword="false"/> if the input ended.</returns>
+    private static bool ChooseOpeningHands(Duel duel)
+    {
+        for (var player = 0; player < PlayerCount; player++)
         {
             if (!PassTo(player))
             {
-                return;
+                return false;
             }
 
             while (true)
             {
-                Show(duel, player);
+                ShowDuel(duel, player);
                 Console.Write("Mulligan: enter hand numbers to exchange, or Enter to keep > ");
                 var input = Console.ReadLine();
                 if (input is null)
                 {
-                    return;
+                    return false;
                 }
 
                 try
                 {
-                    duel.Mulligan(player, Split(input).Select(Index));
+                    duel.Mulligan(player, SplitWords(input).Select(ParseIndex));
                     break;
                 }
-                catch (ArgumentException error)
-                {
-                    Console.WriteLine(error.Message);
-                }
-                catch (FormatException error)
-                {
-                    Console.WriteLine(error.Message);
-                }
-                catch (OverflowException error)
+                catch (Exception error) when (error is ArgumentException or FormatException or OverflowException)
                 {
                     Console.WriteLine(error.Message);
                 }
             }
         }
+        return true;
+    }
 
+    /// <summary>Reads commands until the duel is over.</summary>
+    /// <param name="duel">A duel past setup.</param>
+    /// <returns><see langword="false"/> if a player quit or the input ended first.</returns>
+    private static bool PlayTurns(Duel duel)
+    {
         int? previousViewer = null;
         while (duel.Outcome == DuelOutcome.Ongoing)
         {
@@ -59,20 +80,20 @@ internal static class AlphaDuelConsole
             var viewer = duel.PendingAttack is null ? active : 1 - active;
             if (viewer != previousViewer && !PassTo(viewer))
             {
-                return;
+                return false;
             }
             previousViewer = viewer;
-            Show(duel, viewer);
+            ShowDuel(duel, viewer);
             Console.Write("> ");
             var input = Console.ReadLine();
             if (input is null || input.Equals("quit", StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                return false;
             }
 
             try
             {
-                Execute(duel, viewer, Split(input.ToLowerInvariant()));
+                Execute(duel, viewer, SplitWords(input.ToLowerInvariant()));
             }
             catch (Exception error) when (error is ArgumentException or InvalidOperationException
                 or FormatException or OverflowException)
@@ -80,15 +101,13 @@ internal static class AlphaDuelConsole
                 Console.WriteLine(error.Message);
             }
         }
-
-        Console.WriteLine(duel.Outcome switch
-        {
-            DuelOutcome.PlayerOneWins => "Player 1 wins.",
-            DuelOutcome.PlayerTwoWins => "Player 2 wins.",
-            _ => "The duel is a draw.",
-        });
+        return true;
     }
 
+    /// <summary>Performs one command, or prints help for an unknown one.</summary>
+    /// <param name="duel">The duel.</param>
+    /// <param name="player">The index of the player typing.</param>
+    /// <param name="words">The command split into words.</param>
     private static void Execute(Duel duel, int player, string[] words)
     {
         switch (words)
@@ -97,34 +116,34 @@ internal static class AlphaDuelConsole
                 duel.Advance(player);
                 break;
             case ["well", var hand]:
-                duel.FeedWell(player, Index(hand));
+                duel.FeedWell(player, ParseIndex(hand));
                 break;
             case ["spark"]:
                 duel.UseSpark(player);
                 break;
             case ["play", var hand]:
-                duel.Play(player, Index(hand));
+                duel.Play(player, ParseIndex(hand));
                 break;
             case ["play", var hand, "own", var unit]:
-                duel.Play(player, Index(hand), new(player, Index(unit)));
+                duel.Play(player, ParseIndex(hand), new(player, ParseIndex(unit)));
                 break;
             case ["play", var hand, "enemy", var unit]:
-                duel.Play(player, Index(hand), new(1 - player, Index(unit)));
+                duel.Play(player, ParseIndex(hand), new(1 - player, ParseIndex(unit)));
                 break;
             case ["attack", var unit]:
-                duel.Attack(player, Index(unit));
+                duel.Attack(player, ParseIndex(unit));
                 break;
             case ["attack", var unit, var target]:
-                duel.Attack(player, Index(unit), new(1 - player, Index(target)));
+                duel.Attack(player, ParseIndex(unit), new(1 - player, ParseIndex(target)));
                 break;
             case ["take"]:
                 duel.Defend(player);
                 break;
             case ["intercept", var unit]:
-                duel.Defend(player, Index(unit));
+                duel.Defend(player, ParseIndex(unit));
                 break;
             case ["discard", var hand]:
-                duel.DiscardToLimit(player, Index(hand));
+                duel.DiscardToLimit(player, ParseIndex(hand));
                 break;
             default:
                 Console.WriteLine("Main: well HAND, spark, play HAND [own|enemy UNIT], next");
@@ -134,33 +153,15 @@ internal static class AlphaDuelConsole
         }
     }
 
-    private static void Show(Duel duel, int viewer)
+    /// <summary>Prints the table as one player may see it.</summary>
+    /// <param name="duel">The duel.</param>
+    /// <param name="viewer">The index of the player looking.</param>
+    private static void ShowDuel(Duel duel, int viewer)
     {
         Console.WriteLine($"\nTurn {duel.Turn} · Player {duel.ActivePlayer + 1} · {duel.Phase}");
-        for (var side = 0; side < 2; side++)
+        for (var side = 0; side < PlayerCount; side++)
         {
-            var view = duel.View(side, viewer);
-            Console.WriteLine($"P{side + 1}: {view.Health} Health | {view.DeckCount} deck | {view.HandCount} hand" +
-                $" | {view.ReadyShards + view.TemporaryEnergy} energy | {view.Shards} shards" +
-                $" | {view.Discard.Count} discard" + (view.HasSpark ? " | Spark" : ""));
-            var units = view.Units.Select((unit, index) => unit is null ? null :
-                $"{index + 1}:{unit.Card.Name} {unit.Power}/{unit.Card.Health - unit.Damage}" +
-                (unit.Exhausted ? " exhausted" : "") + (unit.CanAttack ? " [attack]" : "") +
-                (unit.CanIntercept ? " [intercept]" : "")).OfType<string>();
-            Console.WriteLine($"  Units: {string.Join(" | ", units)}");
-            Console.WriteLine($"  Relics: {string.Join(", ", view.Relics.OfType<CardDefinition>().Select(card => card.Name))}");
-            if (view.Hand is { } hand)
-            {
-                for (var i = 0; i < hand.Count; i++)
-                {
-                    var card = hand[i];
-                    Console.WriteLine($"  {i + 1}. {card.Name} ({card.Cost}) — {card.Type}" +
-                        (card.Type == CardType.Unit ? $" {card.Power}/{card.Health}" : "") +
-                        (card.Keywords == CardKeyword.None ? "" : $" {card.Keywords}") +
-                        string.Concat(card.Abilities.Select(ability =>
-                            $" [{ability.Trigger}: {ability.Action} {ability.Amount}, {ability.Target}]")));
-                }
-            }
+            ShowSide(side, duel.View(side, viewer));
         }
 
         if (duel.PendingAttack is { } attack)
@@ -170,6 +171,37 @@ internal static class AlphaDuelConsole
         }
     }
 
+    /// <summary>Prints one side's counts, board and, if visible, hand.</summary>
+    /// <param name="side">The player index.</param>
+    /// <param name="view">The side as the viewer may see it.</param>
+    private static void ShowSide(int side, PlayerView view)
+    {
+        Console.WriteLine($"P{side + 1}: {view.Health} Health | {view.DeckCount} deck | {view.HandCount} hand" +
+            $" | {view.ReadyShards + view.TemporaryEnergy} energy | {view.Shards} shards" +
+            $" | {view.Discard.Count} discard" + (view.HasSpark ? " | Spark" : ""));
+        var units = view.Units.Select((unit, index) => unit is null ? null :
+            $"{index + 1}:{unit.Card.Name} {unit.Power}/{unit.Card.Health - unit.Damage}" +
+            (unit.Exhausted ? " exhausted" : "") + (unit.CanAttack ? " [attack]" : "") +
+            (unit.CanIntercept ? " [intercept]" : "")).OfType<string>();
+        Console.WriteLine($"  Units: {string.Join(" | ", units)}");
+        Console.WriteLine($"  Relics: {string.Join(", ", view.Relics.OfType<CardDefinition>().Select(card => card.Name))}");
+        if (view.Hand is { } hand)
+        {
+            for (var i = 0; i < hand.Count; i++)
+            {
+                var card = hand[i];
+                Console.WriteLine($"  {i + 1}. {card.Name} ({card.Cost}) — {card.Type}" +
+                    (card.Type == CardType.Unit ? $" {card.Power}/{card.Health}" : "") +
+                    (card.Keywords == CardKeyword.None ? "" : $" {card.Keywords}") +
+                    string.Concat(card.Abilities.Select(ability =>
+                        $" [{ability.Trigger}: {ability.Action} {ability.Amount}, {ability.Target}]")));
+            }
+        }
+    }
+
+    /// <summary>Hides the screen while the keyboard changes hands.</summary>
+    /// <param name="player">The index of the next player.</param>
+    /// <returns><see langword="false"/> if the input ended.</returns>
     private static bool PassTo(int player)
     {
         if (!Console.IsOutputRedirected)
@@ -180,8 +212,14 @@ internal static class AlphaDuelConsole
         return Console.ReadLine() is not null;
     }
 
-    private static string[] Split(string input) => input.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+    /// <summary>Splits a line on white space.</summary>
+    /// <param name="input">The line.</param>
+    /// <returns>The words.</returns>
+    private static string[] SplitWords(string input) =>
+        input.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 
-    private static int Index(string input) =>
-        checked(int.Parse(input, System.Globalization.CultureInfo.InvariantCulture) - 1);
+    /// <summary>Converts the one-based number a player types to a zero-based index.</summary>
+    /// <param name="input">The typed number.</param>
+    /// <returns>The index.</returns>
+    private static int ParseIndex(string input) => checked(int.Parse(input, CultureInfo.InvariantCulture) - 1);
 }

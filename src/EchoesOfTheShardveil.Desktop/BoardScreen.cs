@@ -1,6 +1,5 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
 
 namespace EchoesOfTheShardveil.Desktop;
 
@@ -15,142 +14,93 @@ internal sealed class BoardScreen : IScreen
     private readonly Texture2D opponentPortrait;
     private readonly Texture2D heroPlaymat;
     private readonly Texture2D opponentPlaymat;
-    private readonly Texture2D heroHealth;
+    private readonly Texture2D healthAtlas;
     private readonly Texture2D heroDropRing;
-    private readonly Texture2D badgeBlank;
+    private readonly Texture2D blankBadge;
     private readonly RasterizerState boardRasterizer;
     private readonly BoardUI board;
-    // Start as held so the click that opened the board is not treated as a board click.
-    private ButtonState previousButton = ButtonState.Pressed;
-    private ButtonState previousRightButton = ButtonState.Pressed;
-    private bool previousEscape = true;
-    private int previousScroll = Mouse.GetState().ScrollWheelValue;
+    private readonly InputTracker input = new();
 
+    /// <summary>Loads the board artwork and starts a duel.</summary>
+    /// <param name="services">The shared graphics and audio.</param>
     public BoardScreen(GameServices services)
     {
         this.services = services;
         var device = services.Device;
         controls = new WindowControls(services.Audio, isBoard: true);
         boardRasterizer = new RasterizerState { ScissorTestEnable = true };
-        using (var stream = CardGame.OpenEmbeddedAsset(HeroArtwork + ".png"))
-        using (var portrait = Texture2D.FromStream(device, stream, DefaultColorProcessors.PremultiplyAlpha))
-        {
-            heroPortrait = CircleTexture.FramePortrait(portrait, BoardUI.HeroPortraitSize, borderWidth: 2);
-        }
-        using (var stream = CardGame.OpenEmbeddedAsset(HeroArtwork + "-Playmat.jpg"))
-        {
-            heroPlaymat = Texture2D.FromStream(device, stream);
-        }
-        using (var stream = CardGame.OpenEmbeddedAsset("Board-Hero-Health.png"))
-        {
-            heroHealth = Texture2D.FromStream(device, stream, DefaultColorProcessors.PremultiplyAlpha);
-        }
-        using (var stream = CardGame.OpenEmbeddedAsset(OpponentArtwork + ".png"))
-        using (var portrait = Texture2D.FromStream(device, stream, DefaultColorProcessors.PremultiplyAlpha))
-        {
-            opponentPortrait = CircleTexture.FramePortrait(portrait, BoardUI.HeroPortraitSize, borderWidth: 2);
-        }
-        using (var stream = CardGame.OpenEmbeddedAsset(OpponentArtwork + "-Playmat.jpg"))
-        {
-            opponentPlaymat = Texture2D.FromStream(device, stream);
-        }
+        heroPortrait = LoadFramedPortrait(device, HeroArtwork + ".png");
+        heroPlaymat = EmbeddedAssets.LoadTexture(device, HeroArtwork + "-Playmat.jpg");
+        healthAtlas = EmbeddedAssets.LoadPremultipliedTexture(device, "Board-Hero-Health.png");
+        opponentPortrait = LoadFramedPortrait(device, OpponentArtwork + ".png");
+        opponentPlaymat = EmbeddedAssets.LoadTexture(device, OpponentArtwork + "-Playmat.jpg");
         heroDropRing = CircleTexture.Create(device, BoardUI.HeroPortraitSize + 6, borderWidth: 3, Color.Transparent);
-        badgeBlank = CircleTexture.Create(device, BoardUI.HeroHealthSize, borderWidth: 1, Color.Black);
-        using (var stream = CardGame.OpenEmbeddedAsset("Counter-Digits.png"))
-        using (var digitSheet = Texture2D.FromStream(device, stream))
-        {
-            board = new BoardUI(services.Batch, services.Pixel, services.Font, heroPortrait, heroHealth, heroDropRing,
-                badgeBlank, digitSheet, heroPlaymat, opponentPortrait, opponentPlaymat);
-        }
+        blankBadge = CircleTexture.Create(device, BoardUI.BadgeSize, borderWidth: 1, Color.Black);
+        using var digitSheet = EmbeddedAssets.LoadTexture(device, "Counter-Digits.png");
+        board = new BoardUI(services.SpriteBatch, services.Pixel, services.Font, heroPortrait, healthAtlas,
+            heroDropRing, blankBadge, digitSheet, heroPlaymat, opponentPortrait, opponentPlaymat);
     }
 
+    /// <inheritdoc />
     public string Title => "Echoes of the Shardveil - Single player";
 
+    /// <inheritdoc />
     public ScreenTransition Update(GameTime gameTime, Rectangle client, bool isActive)
     {
-        var mouse = Mouse.GetState();
-        var escape = Keyboard.GetState().IsKeyDown(Keys.Escape);
-        var transition = ScreenTransition.None;
-        if (isActive)
-        {
-            var viewport = services.Device.Viewport;
-            var view = new BoardViewport(viewport);
-            board.SetLayout(view);
-
-            var action = WindowControlResult.Ignored;
-            if (escape && !previousEscape)
-            {
-                controls.ToggleExitPrompt();
-                action = WindowControlResult.Handled;
-            }
-            else if (mouse.LeftButton == ButtonState.Pressed && previousButton == ButtonState.Released)
-            {
-                action = controls.Click(mouse.Position, client, viewport);
-            }
-
-            if (action == WindowControlResult.ConfirmedExit)
-            {
-                transition = ScreenTransition.ReturnToMenu;
-            }
-            else if (!controls.IsConfirming)
-            {
-                Point? pointer = null;
-                if (view.TryMap(mouse.Position, client, out var position))
-                {
-                    pointer = position;
-                    if (action == WindowControlResult.Ignored &&
-                        mouse.LeftButton == ButtonState.Pressed && previousButton == ButtonState.Released)
-                    {
-                        board.PointerPressed(position);
-                    }
-                    if (mouse.RightButton == ButtonState.Pressed && previousRightButton == ButtonState.Released)
-                    {
-                        board.RightClick(position);
-                    }
-                    if (mouse.ScrollWheelValue != previousScroll)
-                    {
-                        board.ScrollInspector(position, previousScroll.CompareTo(mouse.ScrollWheelValue));
-                    }
-                }
-                if (mouse.LeftButton == ButtonState.Released && previousButton == ButtonState.Pressed)
-                {
-                    board.PointerReleased(pointer);
-                }
-                board.Update(gameTime.ElapsedGameTime, pointer);
-            }
-            else
-            {
-                board.CancelDrag();
-            }
-        }
-        else
+        var frame = input.Poll();
+        if (!isActive)
         {
             board.CancelDrag();
+            return ScreenTransition.None;
         }
 
-        previousRightButton = mouse.RightButton;
-        previousButton = mouse.LeftButton;
-        previousEscape = escape;
-        previousScroll = mouse.ScrollWheelValue;
-        return transition;
+        var viewport = services.Device.Viewport;
+        var boardViewport = new BoardViewport(viewport);
+        board.SetLayout(boardViewport);
+
+        var action = WindowControlResult.Ignored;
+        if (frame.EscapePressed)
+        {
+            controls.ToggleExitPrompt();
+            action = WindowControlResult.Handled;
+        }
+        else if (frame.LeftPressed)
+        {
+            action = controls.Click(frame.Pointer, client, viewport);
+        }
+
+        if (action == WindowControlResult.ConfirmedExit)
+        {
+            return ScreenTransition.ReturnToMenu;
+        }
+        if (controls.IsConfirming)
+        {
+            board.CancelDrag();
+            return ScreenTransition.None;
+        }
+
+        UpdateBoard(gameTime.ElapsedGameTime, frame, boardViewport, client, action);
+        return ScreenTransition.None;
     }
 
+    /// <inheritdoc />
     public void RequestClose() => controls.RequestExitConfirmation();
 
+    /// <inheritdoc />
     public void Draw(GameTime gameTime)
     {
         var device = services.Device;
         device.Clear(BoardUI.BackgroundColor);
         var viewport = device.Viewport;
-        var view = new BoardViewport(viewport);
-        if (view.IsDrawable)
+        var boardViewport = new BoardViewport(viewport);
+        if (boardViewport.IsDrawable)
         {
             var previousScissor = device.ScissorRectangle;
             var previousRasterizer = device.RasterizerState;
             device.ScissorRectangle = viewport.Bounds;
             try
             {
-                board.Draw(view, boardRasterizer);
+                board.Draw(boardViewport, boardRasterizer);
             }
             finally
             {
@@ -158,19 +108,65 @@ internal sealed class BoardScreen : IScreen
                 device.ScissorRectangle = previousScissor;
             }
         }
-        controls.Draw(services.Batch, services.Pixel, services.Font, viewport);
+        controls.Draw(services.SpriteBatch, services.Pixel, services.Font, viewport);
     }
 
+    /// <inheritdoc />
     public void Dispose()
     {
         heroPortrait.Dispose();
         opponentPortrait.Dispose();
         heroPlaymat.Dispose();
         opponentPlaymat.Dispose();
-        heroHealth.Dispose();
+        healthAtlas.Dispose();
         heroDropRing.Dispose();
-        badgeBlank.Dispose();
+        blankBadge.Dispose();
         board.Dispose();
         boardRasterizer.Dispose();
+    }
+
+    /// <summary>Loads a portrait and frames it in a circle.</summary>
+    /// <param name="device">The graphics device.</param>
+    /// <param name="name">The embedded image name.</param>
+    /// <returns>A texture the caller must dispose.</returns>
+    private static Texture2D LoadFramedPortrait(GraphicsDevice device, string name)
+    {
+        using var portrait = EmbeddedAssets.LoadPremultipliedTexture(device, name);
+        return CircleTexture.FramePortrait(portrait, BoardUI.HeroPortraitSize, borderWidth: 2);
+    }
+
+    /// <summary>
+    /// Forwards this frame's input to the board. A click the window controls already used is not repeated.
+    /// </summary>
+    /// <param name="elapsed">The time since the previous update.</param>
+    /// <param name="frame">This frame's input events.</param>
+    /// <param name="boardViewport">The mapping for the current window.</param>
+    /// <param name="client">The window's client size in mouse units.</param>
+    /// <param name="action">What the window controls did with a click.</param>
+    private void UpdateBoard(TimeSpan elapsed, InputFrame frame, BoardViewport boardViewport, Rectangle client,
+        WindowControlResult action)
+    {
+        Point? pointer = null;
+        if (boardViewport.TryMap(frame.Pointer, client, out var position))
+        {
+            pointer = position;
+            if (action == WindowControlResult.Ignored && frame.LeftPressed)
+            {
+                board.PointerPressed(position);
+            }
+            if (frame.RightPressed)
+            {
+                board.RightClick(position);
+            }
+            if (frame.ScrollDirection != 0)
+            {
+                board.ScrollInspector(position, frame.ScrollDirection);
+            }
+        }
+        if (frame.LeftReleased)
+        {
+            board.PointerReleased(pointer);
+        }
+        board.Update(elapsed, pointer);
     }
 }

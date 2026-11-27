@@ -3,6 +3,7 @@ namespace EchoesOfTheShardveil.Desktop;
 /// <summary>Tracks the optional pre-match rules walkthrough.</summary>
 internal sealed class BoardTutorial
 {
+    /// <summary>Gets the lessons in the order they are shown.</summary>
     public static IReadOnlyList<TutorialPage> Pages { get; } =
     [
         new("Win the duel",
@@ -85,11 +86,19 @@ internal sealed class BoardTutorial
         ]),
     ];
 
+    /// <summary>Gets the current lesson, or -1 while asking whether to show the guide.</summary>
     public int PageIndex { get; private set; } = -1;
+
+    /// <summary>Gets whether the walkthrough is still showing.</summary>
     public bool IsOpen { get; private set; } = true;
+
+    /// <summary>Gets whether the opening question is showing.</summary>
     public bool IsPrompt => PageIndex < 0;
+
+    /// <summary>Gets whether the final lesson is showing.</summary>
     public bool IsLastPage => PageIndex == Pages.Count - 1;
 
+    /// <summary>Moves to the next lesson, or closes the walkthrough after the last one.</summary>
     public void Next()
     {
         if (IsLastPage)
@@ -102,12 +111,27 @@ internal sealed class BoardTutorial
         }
     }
 
+    /// <summary>Moves to the previous lesson, or back to the opening question.</summary>
     public void Back() => PageIndex = Math.Max(-1, PageIndex - 1);
 
+    /// <summary>Ends the walkthrough.</summary>
     public void Close() => IsOpen = false;
 }
 
-internal enum TutorialIllustration { None, Board, Card }
+/// <summary>The picture shown beside a lesson.</summary>
+internal enum TutorialIllustration
+{
+    /// <summary>Text only.</summary>
+    None,
+    /// <summary>A diagram of the board.</summary>
+    Board,
+    /// <summary>An example card.</summary>
+    Card,
+}
 
+/// <summary>One lesson of the walkthrough.</summary>
+/// <param name="Title">The heading.</param>
+/// <param name="Points">The bulleted paragraphs.</param>
+/// <param name="Illustration">The picture shown beside the text.</param>
 internal sealed record TutorialPage(string Title, IReadOnlyList<string> Points,
     TutorialIllustration Illustration = TutorialIllustration.None);

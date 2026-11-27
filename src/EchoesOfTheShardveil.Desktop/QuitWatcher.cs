@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Microsoft.Xna.Framework;
 
 namespace EchoesOfTheShardveil.Desktop;
 
@@ -22,17 +21,17 @@ internal sealed class QuitWatcher : IDisposable
     private delegate void WatchRegistration(nint filter, nint userdata);
 
     private nint library;
+    // Held in a field so the delegate is not collected while SDL still calls it.
     private readonly EventWatch? watch;
-    private readonly WatchRegistration? remove;
+    private readonly WatchRegistration? removeWatch;
     private readonly nint filter;
     private volatile bool windowCloseSeen;
     private volatile bool applicationQuit;
 
+    /// <summary>Starts watching SDL events. If SDL is unavailable, no quit is ever reported.</summary>
     public QuitWatcher()
     {
-        var file = OperatingSystem.IsWindows() ? "SDL2.dll"
-            : OperatingSystem.IsMacOS() ? "libSDL2-2.0.0.dylib" : "libSDL2-2.0.so.0";
-        if (!NativeLibrary.TryLoad(file, typeof(Game).Assembly, null, out library) ||
+        if (!SdlLibrary.TryLoad(out library) ||
             !NativeLibrary.TryGetExport(library, "SDL_AddEventWatch", out var add) ||
             !NativeLibrary.TryGetExport(library, "SDL_DelEventWatch", out var delete))
         {
@@ -41,8 +40,24 @@ internal sealed class QuitWatcher : IDisposable
 
         watch = OnEvent;
         filter = Marshal.GetFunctionPointerForDelegate(watch);
-        remove = Marshal.GetDelegateForFunctionPointer<WatchRegistration>(delete);
+        removeWatch = Marshal.GetDelegateForFunctionPointer<WatchRegistration>(delete);
         Marshal.GetDelegateForFunctionPointer<WatchRegistration>(add)(filter, 0);
+    }
+
+    /// <summary>Returns whether the latest exit request was an application quit, and clears it.</summary>
+    /// <returns><see langword="true"/> if the application was quit other than by the close button.</returns>
+    public bool TakeApplicationQuit()
+    {
+        var quit = applicationQuit;
+        applicationQuit = false;
+        return quit;
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        removeWatch?.Invoke(filter, 0);
+        SdlLibrary.Free(ref library);
     }
 
     private int OnEvent(nint userdata, nint sdlEvent)
@@ -59,26 +74,5 @@ internal sealed class QuitWatcher : IDisposable
             windowCloseSeen = false;
         }
         return 1;
-    }
-
-    /// <summary>Returns whether the latest exit request was an application quit, and clears it.</summary>
-    public bool TakeApplicationQuit()
-    {
-        var quit = applicationQuit;
-        applicationQuit = false;
-        return quit;
-    }
-
-    public void Dispose()
-    {
-        if (remove is not null)
-        {
-            remove(filter, 0);
-        }
-        var handle = Interlocked.Exchange(ref library, 0);
-        if (handle != 0)
-        {
-            NativeLibrary.Free(handle);
-        }
     }
 }

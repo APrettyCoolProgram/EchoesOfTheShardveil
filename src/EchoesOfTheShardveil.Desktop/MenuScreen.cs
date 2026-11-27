@@ -1,6 +1,5 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
 
 namespace EchoesOfTheShardveil.Desktop;
 
@@ -11,89 +10,81 @@ internal sealed class MenuScreen : IScreen
     private readonly Texture2D mural;
     private readonly Texture2D sideScenes;
     private readonly SideSceneEffects sideEffects;
-    private readonly Texture2D title;
-    private readonly Texture2D menu;
+    private readonly Texture2D titleTexture;
+    private readonly Texture2D menuBar;
     private readonly Texture2D glow;
     private readonly Texture2D artworkMask;
     private readonly RasterizerState muralRasterizer;
     private readonly TitleReveal titleReveal;
     private readonly MainUI mainUI;
     private readonly WindowControls controls;
-    private ButtonState previousButton;
-    private bool previousEscape;
+    private readonly InputTracker input = new();
     private TimeSpan? shownAt;
 
+    /// <summary>Loads the menu artwork and builds the textures its animations need.</summary>
+    /// <param name="services">The shared graphics and audio.</param>
     public MenuScreen(GameServices services)
     {
         this.services = services;
         var device = services.Device;
         controls = new WindowControls(services.Audio, isBoard: false);
-        using (var stream = CardGame.OpenEmbeddedAsset("MainUI-Mural.png"))
-        {
-            mural = Texture2D.FromStream(device, stream);
-        }
-        using (var stream = CardGame.OpenEmbeddedAsset("MainUI-SideScenes.png"))
-        {
-            sideScenes = Texture2D.FromStream(device, stream);
-        }
-        using (var stream = CardGame.OpenEmbeddedAsset("MainUI-Title.png"))
-        {
-            title = Texture2D.FromStream(device, stream, DefaultColorProcessors.PremultiplyAlpha);
-        }
-        using (var stream = CardGame.OpenEmbeddedAsset("MainUI-Menu.png"))
-        {
-            menu = Texture2D.FromStream(device, stream, DefaultColorProcessors.PremultiplyAlpha);
-        }
+        mural = EmbeddedAssets.LoadTexture(device, "MainUI-Mural.png");
+        sideScenes = EmbeddedAssets.LoadTexture(device, "MainUI-SideScenes.png");
+        titleTexture = EmbeddedAssets.LoadPremultipliedTexture(device, "MainUI-Title.png");
+        menuBar = EmbeddedAssets.LoadPremultipliedTexture(device, "MainUI-Menu.png");
         glow = MuralEffects.CreateGlow(device);
         artworkMask = MuralEffects.CreateArtworkMask(mural);
         muralRasterizer = new RasterizerState { ScissorTestEnable = true };
-        titleReveal = new TitleReveal(title, glow);
+        titleReveal = new TitleReveal(titleTexture, glow);
         sideEffects = new SideSceneEffects(sideScenes);
-        mainUI = new MainUI(device, services.Batch, mural, sideScenes, sideEffects, title, menu,
-            new MuralEffects(services.Batch, glow, artworkMask, mural, muralRasterizer), titleReveal, muralRasterizer);
-        Activate();
+        mainUI = new MainUI(device, services.SpriteBatch, mural, sideScenes, sideEffects, titleTexture, menuBar,
+            new MuralEffects(services.SpriteBatch, glow, artworkMask, mural, muralRasterizer), titleReveal,
+            muralRasterizer);
     }
 
+    /// <inheritdoc />
     public string Title => "Echoes of the Shardveil";
 
     /// <summary>Prepares the menu to be shown again: replays the title reveal and ignores held input.</summary>
     public void Activate()
     {
-        // Treat the button and key as held so the click or key press that opened the menu is not reused.
-        previousButton = ButtonState.Pressed;
-        previousEscape = true;
+        input.Reset();
         shownAt = null;
     }
 
+    /// <inheritdoc />
     public ScreenTransition Update(GameTime gameTime, Rectangle client, bool isActive)
     {
-        var mouse = Mouse.GetState();
-        var escape = Keyboard.GetState().IsKeyDown(Keys.Escape);
-        var transition = ScreenTransition.None;
-        if (isActive && escape && !previousEscape)
+        var frame = input.Poll();
+        if (!isActive)
+        {
+            return ScreenTransition.None;
+        }
+
+        if (frame.EscapePressed)
         {
             controls.ToggleExitPrompt();
         }
-        else if (isActive && mouse.LeftButton == ButtonState.Pressed && previousButton == ButtonState.Released)
+        else if (frame.LeftPressed)
         {
-            var action = controls.Click(mouse.Position, client, services.Device.Viewport);
+            var action = controls.Click(frame.Pointer, client, services.Device.Viewport);
             if (action == WindowControlResult.ConfirmedExit)
             {
-                transition = ScreenTransition.ExitGame;
+                return ScreenTransition.ExitGame;
             }
-            else if (action == WindowControlResult.Ignored && mainUI.IsSinglePlayer(mouse.Position, client))
+            if (action == WindowControlResult.Ignored && mainUI.IsOverSinglePlayer(frame.Pointer, client))
             {
-                transition = ScreenTransition.OpenBoard;
+                return ScreenTransition.OpenBoard;
             }
         }
 
-        previousButton = mouse.LeftButton;
-        previousEscape = escape;
-        return transition;
+        return ScreenTransition.None;
     }
 
+    /// <inheritdoc />
     public void RequestClose() => controls.RequestExitConfirmation();
 
+    /// <inheritdoc />
     public void Draw(GameTime gameTime)
     {
         // The animations are timed from when the menu was last shown, so the title reveal replays on return.
@@ -101,17 +92,18 @@ internal sealed class MenuScreen : IScreen
         var device = services.Device;
         device.Clear(Color.Black);
         mainUI.Draw(new GameTime(gameTime.TotalGameTime - shownAt.Value, gameTime.ElapsedGameTime));
-        controls.Draw(services.Batch, services.Pixel, services.Font, device.Viewport);
+        controls.Draw(services.SpriteBatch, services.Pixel, services.Font, device.Viewport);
     }
 
+    /// <inheritdoc />
     public void Dispose()
     {
         muralRasterizer.Dispose();
         artworkMask.Dispose();
         glow.Dispose();
-        menu.Dispose();
+        menuBar.Dispose();
         titleReveal.Dispose();
-        title.Dispose();
+        titleTexture.Dispose();
         sideEffects.Dispose();
         sideScenes.Dispose();
         mural.Dispose();

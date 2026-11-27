@@ -80,6 +80,8 @@ internal sealed class SideSceneEffects : IDisposable
     private readonly Texture2D cityLightsOff;
     private readonly int[] flickeringCityLights;
 
+    /// <summary>Builds the masks and sprites the animations need from the side artwork.</summary>
+    /// <param name="artwork">The two side panels. The caller keeps ownership.</param>
     public SideSceneEffects(Texture2D artwork)
     {
         gillMasks = CreateGillMasks(artwork);
@@ -91,9 +93,13 @@ internal sealed class SideSceneEffects : IDisposable
     }
 
     /// <summary>Ripples the forest tree and animates the mist and lights around the ruins.</summary>
-    public void DrawForest(SpriteBatch batch, Rectangle crop, Matrix transform, float time)
+    /// <param name="spriteBatch">A sprite batch that has already begun.</param>
+    /// <param name="crop">The visible part of the artwork.</param>
+    /// <param name="transform">The transform from artwork to screen.</param>
+    /// <param name="time">Seconds of animation.</param>
+    public void DrawForest(SpriteBatch spriteBatch, Rectangle crop, Matrix transform, float time)
     {
-        var scale = new Vector2(transform.M11, transform.M22);
+        var scale = ScaleOf(transform);
         var visible = Rectangle.Intersect(crop, TreeArea);
         // Give the moving strips room to shift without crossing the panel boundary.
         visible.Inflate(-5, 0);
@@ -106,7 +112,7 @@ internal sealed class SideSceneEffects : IDisposable
                     + 0.9f * MathF.Sin(y * 0.069f - time * 0.8f);
                 var row = new Rectangle(visible.X - TreeArea.X, y - TreeArea.Y, visible.Width, height);
                 var position = Vector2.Transform(new Vector2(visible.X + sway, y), transform);
-                batch.Draw(treeMask, position, row, Color.White, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+                spriteBatch.Draw(treeMask, position, row, Color.White, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
             }
         }
 
@@ -121,7 +127,7 @@ internal sealed class SideSceneEffects : IDisposable
                 var curl = 7f * MathF.Sin(phase) + 3f * MathF.Sin(phase * 1.8f + 1.3f);
                 var row = new Rectangle(fog.X - ForestFogArea.X, y - ForestFogArea.Y, fog.Width, height);
                 var position = Vector2.Transform(new Vector2(fog.X + curl, y), transform);
-                batch.Draw(forestFog, position, row, Color.White * (0.78f + 0.19f * MathF.Sin(phase)),
+                spriteBatch.Draw(forestFog, position, row, Color.White * (0.78f + 0.19f * MathF.Sin(phase)),
                     0, Vector2.Zero, scale, SpriteEffects.None, 0);
             }
         }
@@ -131,7 +137,7 @@ internal sealed class SideSceneEffects : IDisposable
             var (center, radius, angle) = FogBanks[i];
             var phase = time * (0.29f + i % 3 * 0.08f) + i * 2.1f;
             var drift = new Vector2(MathF.Cos(phase) * 24, MathF.Sin(phase) * 9);
-            DrawHaze(batch, crop, transform, center + drift, new Vector2(radius.X * 0.68f, radius.Y * 0.55f),
+            DrawHaze(spriteBatch, crop, transform, center + drift, new Vector2(radius.X * 0.68f, radius.Y * 0.55f),
                 new Color(119, 169, 182) * (0.12f + 0.045f * MathF.Sin(phase)), angle + 0.22f * MathF.Cos(phase));
         }
 
@@ -139,15 +145,19 @@ internal sealed class SideSceneEffects : IDisposable
         {
             var pulse = 0.5f + 0.5f * MathF.Sin(time * MathHelper.TwoPi / (8.5f + i * 0.7f) + i * 2.1f);
             var tint = new Color(89, 224, 255);
-            DrawHaze(batch, crop, transform, Wisps[i], new Vector2(30, 47) * (0.92f + 0.12f * pulse),
+            DrawHaze(spriteBatch, crop, transform, Wisps[i], new Vector2(30, 47) * (0.92f + 0.12f * pulse),
                 tint * (0.12f + 0.32f * pulse));
-            DrawHaze(batch, crop, transform, Wisps[i], new Vector2(9, 18),
+            DrawHaze(spriteBatch, crop, transform, Wisps[i], new Vector2(9, 18),
                 new Color(178, 247, 255) * (0.29f + 0.38f * pulse));
         }
     }
 
     /// <summary>Flickers the painted warm window and street lights in the distant fairy city.</summary>
-    public void DrawCityLights(SpriteBatch batch, Rectangle crop, Matrix transform, float time)
+    /// <param name="spriteBatch">A sprite batch that has already begun.</param>
+    /// <param name="crop">The visible part of the artwork.</param>
+    /// <param name="transform">The transform from artwork to screen.</param>
+    /// <param name="time">Seconds of animation.</param>
+    public void DrawCityLights(SpriteBatch spriteBatch, Rectangle crop, Matrix transform, float time)
     {
         const float pauseDuration = 1f;
         const float offDuration = 1.25f;
@@ -169,32 +179,41 @@ internal sealed class SideSceneEffects : IDisposable
         var source = visible;
         source.Offset(index % LightAtlasColumns * LightCellWidth - light.X,
             index / LightAtlasColumns * LightCellHeight - light.Y);
-        var scale = new Vector2(transform.M11, transform.M22);
-        batch.Draw(cityLightsOff, Vector2.Transform(visible.Location.ToVector2(), transform), source,
-            Color.White, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+        spriteBatch.Draw(cityLightsOff, Vector2.Transform(visible.Location.ToVector2(), transform), source,
+            Color.White, 0, Vector2.Zero, ScaleOf(transform), SpriteEffects.None, 0);
     }
 
-    private void DrawHaze(SpriteBatch batch, Rectangle crop, Matrix transform, Vector2 center, Vector2 size,
+    /// <summary>Draws a soft patch of light or mist, fading it out near the edge of the visible artwork.</summary>
+    /// <param name="spriteBatch">A sprite batch that has already begun.</param>
+    /// <param name="crop">The visible part of the artwork.</param>
+    /// <param name="transform">The transform from artwork to screen.</param>
+    /// <param name="center">The patch's center in the artwork.</param>
+    /// <param name="size">The patch's size in the artwork.</param>
+    /// <param name="tint">The color.</param>
+    /// <param name="angle">The rotation in radians.</param>
+    private void DrawHaze(SpriteBatch spriteBatch, Rectangle crop, Matrix transform, Vector2 center, Vector2 size,
         Color tint, float angle = 0)
     {
-        var margin = Math.Min(Math.Min(center.X - crop.Left, crop.Right - center.X),
-            Math.Min(center.Y - crop.Top, crop.Bottom - center.Y));
         var radius = size.Length() / 2;
-        var fade = Math.Clamp((margin - radius) / 12, 0, 1);
+        var fade = Math.Clamp((DistanceToEdge(crop, center) - radius) / 12, 0, 1);
         if (fade <= 0)
         {
             return;
         }
 
         var scale = size * new Vector2(transform.M11 / atmosphere.Width, transform.M22 / atmosphere.Height);
-        batch.Draw(atmosphere, Vector2.Transform(center, transform), null, tint * fade, angle,
+        spriteBatch.Draw(atmosphere, Vector2.Transform(center, transform), null, tint * fade, angle,
             new Vector2(atmosphere.Width / 2f, atmosphere.Height / 2f), scale, SpriteEffects.None, 0);
     }
 
     /// <summary>Draws tumbling leaves blowing left to right across the forest path.</summary>
-    public void DrawLeaves(SpriteBatch batch, Rectangle source, Matrix transform, float time)
+    /// <param name="spriteBatch">A sprite batch that has already begun.</param>
+    /// <param name="source">The visible part of the artwork.</param>
+    /// <param name="transform">The transform from artwork to screen.</param>
+    /// <param name="time">Seconds of animation.</param>
+    public void DrawLeaves(SpriteBatch spriteBatch, Rectangle source, Matrix transform, float time)
     {
-        var scale = new Vector2(transform.M11, transform.M22);
+        var scale = ScaleOf(transform);
         for (var i = 0; i < PathCrossings.Length; i++)
         {
             var (y, left, right) = PathCrossings[i];
@@ -207,9 +226,7 @@ internal sealed class SideSceneEffects : IDisposable
             var gust = travel - 0.11f * MathF.Sin(travel * MathHelper.TwoPi);
             var bounce = MathF.Abs(MathF.Sin(travel * 18 + i)) * MathHelper.Lerp(1.5f, 5f, depth);
             var position = new Vector2(MathHelper.Lerp(left + radius, right - radius, gust), y - bounce);
-            var margin = Math.Min(Math.Min(position.X - source.Left, source.Right - position.X),
-                Math.Min(position.Y - source.Top, source.Bottom - position.Y));
-            var opacity = Math.Clamp((margin - radius) / 10, 0, 1) *
+            var opacity = Math.Clamp((DistanceToEdge(source, position) - radius) / 10, 0, 1) *
                 Math.Clamp(Math.Min(travel, 1 - travel) * 10, 0, 1);
             if (opacity <= 0)
             {
@@ -218,13 +235,17 @@ internal sealed class SideSceneEffects : IDisposable
 
             var tumble = travel * (9.5f + i % 4 * 1.4f) + i * 2.4f;
             var leafScale = scale * new Vector2(size, size * (0.2f + 0.8f * MathF.Abs(MathF.Sin(tumble))));
-            batch.Draw(leaf, Vector2.Transform(position, transform), null, LeafColors[i % LeafColors.Length] * opacity,
+            spriteBatch.Draw(leaf, Vector2.Transform(position, transform), null, LeafColors[i % LeafColors.Length] * opacity,
                 tumble, new Vector2(leaf.Width / 2f, leaf.Height / 2f), leafScale, SpriteEffects.None, 0);
         }
     }
 
     /// <summary>Sweeps color clockwise around the painted gills without moving the caps or stems.</summary>
-    public void DrawGills(SpriteBatch batch, Rectangle crop, Matrix transform, float time)
+    /// <param name="spriteBatch">A sprite batch that has already begun.</param>
+    /// <param name="crop">The visible part of the artwork.</param>
+    /// <param name="transform">The transform from artwork to screen.</param>
+    /// <param name="time">Seconds of animation.</param>
+    public void DrawGills(SpriteBatch spriteBatch, Rectangle crop, Matrix transform, float time)
     {
         var visible = Rectangle.Intersect(crop, GillArea);
         if (visible.Width == 0 || visible.Height == 0)
@@ -233,7 +254,7 @@ internal sealed class SideSceneEffects : IDisposable
         }
 
         var position = Vector2.Transform(visible.Location.ToVector2(), transform);
-        var scale = new Vector2(transform.M11, transform.M22);
+        var scale = ScaleOf(transform);
         for (var sector = 0; sector < SectorCount; sector++)
         {
             var phase = (sector / (float)SectorCount - time / 12.8f) * MathHelper.TwoPi;
@@ -243,10 +264,13 @@ internal sealed class SideSceneEffects : IDisposable
                 0.54f + 0.46f * MathF.Cos(phase + MathHelper.TwoPi / 3));
             var mask = new Rectangle(visible.X - GillArea.X, visible.Y - GillArea.Y + sector * GillArea.Height,
                 visible.Width, visible.Height);
-            batch.Draw(gillMasks, position, mask, color * 0.64f, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            spriteBatch.Draw(gillMasks, position, mask, color * 0.64f, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
         }
     }
 
+    /// <summary>Splits the painted gills into angular sectors, one mask per sector.</summary>
+    /// <param name="artwork">The side artwork.</param>
+    /// <returns>The masks stacked vertically.</returns>
     private static Texture2D CreateGillMasks(Texture2D artwork)
     {
         var stride = GillArea.Width * GillArea.Height;
@@ -254,113 +278,131 @@ internal sealed class SideSceneEffects : IDisposable
         artwork.GetData(0, GillArea, pixels, 0, pixels.Length);
         var masks = new Color[stride * SectorCount];
         for (var y = 0; y < GillArea.Height; y++)
-        for (var x = 0; x < GillArea.Width; x++)
-        {
-            var point = new Vector2(GillArea.X + x + 0.5f, GillArea.Y + y + 0.5f);
-            var index = y * GillArea.Width + x;
-            foreach (var (center, outline) in Gills)
+            for (var x = 0; x < GillArea.Width; x++)
             {
-                var coverage = OutlineCoverage(point, outline);
-                if (coverage <= 0)
+                var point = new Vector2(GillArea.X + x + 0.5f, GillArea.Y + y + 0.5f);
+                var index = y * GillArea.Width + x;
+                foreach (var (center, outline) in Gills)
                 {
-                    continue;
+                    var coverage = OutlineCoverage(point, outline);
+                    if (coverage <= 0)
+                    {
+                        continue;
+                    }
+
+                    var offset = point - center;
+                    var angle = MathF.Atan2(offset.Y * 2.7f, offset.X);
+                    var phase = (angle / MathHelper.TwoPi + 1) * SectorCount;
+                    var lower = (int)phase;
+                    var fraction = phase - lower;
+                    var light = coverage * (0.20f + 0.80f * pixels[index].G / 255);
+                    masks[lower % SectorCount * stride + index] = Color.White * (light * (1 - fraction));
+                    masks[(lower + 1) % SectorCount * stride + index] = Color.White * (light * fraction);
+                    break;
                 }
-
-                var offset = point - center;
-                var angle = MathF.Atan2(offset.Y * 2.7f, offset.X);
-                var phase = (angle / MathHelper.TwoPi + 1) * SectorCount;
-                var lower = (int)phase;
-                var fraction = phase - lower;
-                var light = coverage * (0.20f + 0.80f * pixels[index].G / 255);
-                masks[lower % SectorCount * stride + index] = Color.White * (light * (1 - fraction));
-                masks[(lower + 1) % SectorCount * stride + index] = Color.White * (light * fraction);
-                break;
             }
-        }
 
-        var texture = new Texture2D(artwork.GraphicsDevice, GillArea.Width, GillArea.Height * SectorCount);
-        texture.SetData(masks);
-        return texture;
+        return TextureFactory.FromPixels(artwork.GraphicsDevice, GillArea.Width, GillArea.Height * SectorCount, masks);
     }
 
+    /// <summary>Gets the scale of an axis-aligned transform.</summary>
+    /// <param name="transform">The transform.</param>
+    /// <returns>The horizontal and vertical scale.</returns>
+    private static Vector2 ScaleOf(Matrix transform) => new(transform.M11, transform.M22);
+
+    /// <summary>Measures how far a point is inside a rectangle.</summary>
+    /// <param name="bounds">The rectangle.</param>
+    /// <param name="point">The point.</param>
+    /// <returns>The distance to the nearest side, negative outside.</returns>
+    private static float DistanceToEdge(Rectangle bounds, Vector2 point) =>
+        Math.Min(Math.Min(point.X - bounds.Left, bounds.Right - point.X),
+            Math.Min(point.Y - bounds.Top, bounds.Bottom - point.Y));
+
+    /// <summary>Rates how far inside a gill outline a point is, for a soft edge.</summary>
+    /// <param name="point">The point.</param>
+    /// <param name="outline">The corners of the outline.</param>
+    /// <returns>From 0 outside to 1 well inside.</returns>
     private static float OutlineCoverage(Vector2 point, Vector2[] outline)
     {
-        var inside = false;
+        if (!Geometry.IsInPolygon(point, outline))
+        {
+            return 0;
+        }
+
         var distanceSquared = float.PositiveInfinity;
         for (var i = 0; i < outline.Length; i++)
         {
-            var a = outline[i];
-            var b = outline[(i + 1) % outline.Length];
-            var edge = b - a;
-            if ((a.Y > point.Y) != (b.Y > point.Y) && point.X < a.X + (point.Y - a.Y) * edge.X / edge.Y)
-            {
-                inside = !inside;
-            }
-            var projection = Math.Clamp(Vector2.Dot(point - a, edge) / edge.LengthSquared(), 0, 1);
-            distanceSquared = Math.Min(distanceSquared, Vector2.DistanceSquared(point, a + edge * projection));
+            distanceSquared = Math.Min(distanceSquared,
+                Geometry.DistanceSquaredToSegment(point, outline[i], outline[(i + 1) % outline.Length]));
         }
 
-        return inside ? Math.Clamp(MathF.Sqrt(distanceSquared) / 3, 0, 1) : 0;
+        return Math.Clamp(MathF.Sqrt(distanceSquared) / 3, 0, 1);
     }
 
+    /// <summary>Draws a small leaf sprite.</summary>
+    /// <param name="device">The graphics device.</param>
+    /// <returns>The sprite.</returns>
     private static Texture2D CreateLeaf(GraphicsDevice device)
     {
         const int width = 24;
         const int height = 12;
         var pixels = new Color[width * height];
         for (var y = 0; y < height; y++)
-        for (var x = 0; x < width; x++)
-        {
-            var along = (x + 0.5f) / width;
-            var across = y + 0.5f - height / 2f;
-            var edge = 4.5f * MathF.Sin(along * MathHelper.Pi);
-            var coverage = Math.Clamp(edge - MathF.Abs(across), 0, 1);
-            var shade = MathF.Abs(across) < 1 ? 1f : 0.78f - 0.14f * across / height;
-            pixels[y * width + x] = new Color(shade, shade, shade) * coverage;
-        }
+            for (var x = 0; x < width; x++)
+            {
+                var along = (x + 0.5f) / width;
+                var across = y + 0.5f - height / 2f;
+                var edge = 4.5f * MathF.Sin(along * MathHelper.Pi);
+                var coverage = Math.Clamp(edge - MathF.Abs(across), 0, 1);
+                var shade = MathF.Abs(across) < 1 ? 1f : 0.78f - 0.14f * across / height;
+                pixels[y * width + x] = new Color(shade, shade, shade) * coverage;
+            }
 
-        var texture = new Texture2D(device, width, height);
-        texture.SetData(pixels);
-        return texture;
+        return TextureFactory.FromPixels(device, width, height, pixels);
     }
 
+    /// <summary>Selects the dark bark of the forest tree, fading toward the area's edges.</summary>
+    /// <param name="artwork">The side artwork.</param>
+    /// <returns>The tree texture.</returns>
     private static Texture2D CreateTreeMask(Texture2D artwork)
     {
         var pixels = new Color[TreeArea.Width * TreeArea.Height];
         artwork.GetData(0, TreeArea, pixels, 0, pixels.Length);
         for (var y = 0; y < TreeArea.Height; y++)
-        for (var x = 0; x < TreeArea.Width; x++)
-        {
-            var index = y * TreeArea.Width + x;
-            var pixel = pixels[index];
-            var bark = Math.Clamp((94 - Math.Max(pixel.R, pixel.G)) / 52f, 0, 1);
-            var horizontal = Math.Clamp(Math.Min(x, TreeArea.Width - 1 - x) / 38f, 0, 1);
-            var vertical = Math.Clamp(Math.Min(y, TreeArea.Height - 1 - y) / 52f, 0, 1);
-            pixels[index] = pixel * (bark * horizontal * vertical * 0.72f);
-        }
+            for (var x = 0; x < TreeArea.Width; x++)
+            {
+                var index = y * TreeArea.Width + x;
+                var pixel = pixels[index];
+                var bark = Math.Clamp((94 - Math.Max(pixel.R, pixel.G)) / 52f, 0, 1);
+                var horizontal = Math.Clamp(Math.Min(x, TreeArea.Width - 1 - x) / 38f, 0, 1);
+                var vertical = Math.Clamp(Math.Min(y, TreeArea.Height - 1 - y) / 52f, 0, 1);
+                pixels[index] = pixel * (bark * horizontal * vertical * 0.72f);
+            }
 
-        var texture = new Texture2D(artwork.GraphicsDevice, TreeArea.Width, TreeArea.Height);
-        texture.SetData(pixels);
-        return texture;
+        return TextureFactory.FromPixels(artwork.GraphicsDevice, TreeArea.Width, TreeArea.Height, pixels);
     }
 
+    /// <summary>Draws the soft round sprite used for haze.</summary>
+    /// <param name="device">The graphics device.</param>
+    /// <returns>The sprite.</returns>
     private static Texture2D CreateAtmosphere(GraphicsDevice device)
     {
         const int size = 32;
         var pixels = new Color[size * size];
         for (var y = 0; y < size; y++)
-        for (var x = 0; x < size; x++)
-        {
-            var point = new Vector2(x + 0.5f, y + 0.5f) / (size / 2f) - Vector2.One;
-            var falloff = Math.Max(0, 1 - point.LengthSquared());
-            pixels[y * size + x] = Color.White * (falloff * falloff);
-        }
+            for (var x = 0; x < size; x++)
+            {
+                var point = new Vector2(x + 0.5f, y + 0.5f) / (size / 2f) - Vector2.One;
+                var falloff = Math.Max(0, 1 - point.LengthSquared());
+                pixels[y * size + x] = Color.White * (falloff * falloff);
+            }
 
-        var texture = new Texture2D(device, size, size);
-        texture.SetData(pixels);
-        return texture;
+        return TextureFactory.FromPixels(device, size, size, pixels);
     }
 
+    /// <summary>Selects the pale painted fog inside the fog banks, leaving the wisps clear.</summary>
+    /// <param name="artwork">The side artwork.</param>
+    /// <returns>The fog texture.</returns>
     private static Texture2D CreateForestFog(Texture2D artwork)
     {
         var pixels = new Color[ForestFogArea.Width * ForestFogArea.Height];
@@ -370,44 +412,49 @@ internal sealed class SideSceneEffects : IDisposable
         {
             var rotation = Matrix.CreateRotationZ(-angle);
             for (var y = 0; y < ForestFogArea.Height; y++)
-            for (var x = 0; x < ForestFogArea.Width; x++)
-            {
-                var point = new Vector2(ForestFogArea.X + x, ForestFogArea.Y + y);
-                var local = Vector2.Transform(point - center, rotation) / radius;
-                var feather = Math.Clamp((1 - local.LengthSquared()) * 1.5f, 0, 1);
-                var index = y * ForestFogArea.Width + x;
-                coverage[index] = Math.Max(coverage[index], feather * feather);
-            }
+                for (var x = 0; x < ForestFogArea.Width; x++)
+                {
+                    var point = new Vector2(ForestFogArea.X + x, ForestFogArea.Y + y);
+                    var local = Vector2.Transform(point - center, rotation) / radius;
+                    var feather = Math.Clamp((1 - local.LengthSquared()) * 1.5f, 0, 1);
+                    var index = y * ForestFogArea.Width + x;
+                    coverage[index] = Math.Max(coverage[index], feather * feather);
+                }
         }
 
         for (var y = 0; y < ForestFogArea.Height; y++)
-        for (var x = 0; x < ForestFogArea.Width; x++)
-        {
-            var index = y * ForestFogArea.Width + x;
-            var pixel = pixels[index];
-            var cool = Math.Clamp((Math.Min(pixel.G, pixel.B) - pixel.R + 8) / 33f, 0, 1);
-            var luminance = Math.Clamp((pixel.G - 42) / 76f, 0, 1);
-            var point = new Vector2(ForestFogArea.X + x, ForestFogArea.Y + y);
-            var wispClearance = 1f;
-            foreach (var wisp in Wisps)
+            for (var x = 0; x < ForestFogArea.Width; x++)
             {
-                wispClearance = Math.Min(wispClearance,
-                    Math.Clamp((Vector2.DistanceSquared(point, wisp) - 13 * 13) / (25 * 25 - 13 * 13f), 0, 1));
+                var index = y * ForestFogArea.Width + x;
+                var pixel = pixels[index];
+                var cool = Math.Clamp((Math.Min(pixel.G, pixel.B) - pixel.R + 8) / 33f, 0, 1);
+                var luminance = Math.Clamp((pixel.G - 42) / 76f, 0, 1);
+                var point = new Vector2(ForestFogArea.X + x, ForestFogArea.Y + y);
+                var wispClearance = 1f;
+                foreach (var wisp in Wisps)
+                {
+                    wispClearance = Math.Min(wispClearance,
+                        Math.Clamp((Vector2.DistanceSquared(point, wisp) - 13 * 13) / (25 * 25 - 13 * 13f), 0, 1));
+                }
+                pixels[index] = pixel * (coverage[index] * cool * luminance * wispClearance * 0.74f);
             }
-            pixels[index] = pixel * (coverage[index] * cool * luminance * wispClearance * 0.74f);
-        }
 
-        var texture = new Texture2D(artwork.GraphicsDevice, ForestFogArea.Width, ForestFogArea.Height);
-        texture.SetData(pixels);
-        return texture;
+        return TextureFactory.FromPixels(artwork.GraphicsDevice, ForestFogArea.Width, ForestFogArea.Height, pixels);
     }
 
+    /// <summary>Gets the area of a painted city light.</summary>
+    /// <param name="index">The light's index.</param>
+    /// <returns>The area in the artwork.</returns>
     private static Rectangle CityLightBounds(int index)
     {
         var (x, y, rx, ry) = CityLights[index];
         return new Rectangle(x - rx, y - ry, 2 * rx + 1, 2 * ry + 1);
     }
 
+    /// <summary>Builds unlit versions of the painted city lights.</summary>
+    /// <param name="artwork">The side artwork.</param>
+    /// <param name="flickeringLights">The lights that turned out to be painted, in shuffled flicker order.</param>
+    /// <returns>An atlas with one cell per light.</returns>
     private static Texture2D CreateCityLightsOff(Texture2D artwork, out int[] flickeringLights)
     {
         const int width = LightAtlasColumns * LightCellWidth;
@@ -423,29 +470,29 @@ internal sealed class SideSceneEffects : IDisposable
             var surroundings = Vector3.Zero;
             var weightSum = 0f;
             for (var y = 0; y < light.Height; y++)
-            for (var x = 0; x < light.Width; x++)
-            {
-                var distance = new Vector2((x - rx) / (float)rx, (y - ry) / (float)ry).LengthSquared();
-                if (distance < 0.72f || distance > 1.5f)
+                for (var x = 0; x < light.Width; x++)
                 {
-                    continue;
-                }
+                    var distance = new Vector2((x - rx) / (float)rx, (y - ry) / (float)ry).LengthSquared();
+                    if (distance < 0.72f || distance > 1.5f)
+                    {
+                        continue;
+                    }
 
-                var pixel = pixels[y * light.Width + x];
-                var weight = 1f / (16f + Math.Max(0, pixel.R - pixel.B));
-                surroundings += pixel.ToVector3() * weight;
-                weightSum += weight;
-            }
+                    var pixel = pixels[y * light.Width + x];
+                    var weight = 1f / (16f + Math.Max(0, pixel.R - pixel.B));
+                    surroundings += pixel.ToVector3() * weight;
+                    weightSum += weight;
+                }
 
             var unlit = new Color(surroundings / weightSum);
             var hasPaintedLight = false;
             for (var y = ry - 2; y <= ry + 2; y++)
-            for (var x = rx - 2; x <= rx + 2; x++)
-            {
-                var pixel = pixels[y * light.Width + x];
-                hasPaintedLight |= pixel.R >= 174 && pixel.G >= 113 &&
-                    pixel.R - pixel.B >= 24 && pixel.R - unlit.R >= 20;
-            }
+                for (var x = rx - 2; x <= rx + 2; x++)
+                {
+                    var pixel = pixels[y * light.Width + x];
+                    hasPaintedLight |= pixel.R >= 174 && pixel.G >= 113 &&
+                        pixel.R - pixel.B >= 24 && pixel.R - unlit.R >= 20;
+                }
             if (!hasPaintedLight)
             {
                 continue;
@@ -455,24 +502,23 @@ internal sealed class SideSceneEffects : IDisposable
             var tileX = i % LightAtlasColumns * LightCellWidth;
             var tileY = i / LightAtlasColumns * LightCellHeight;
             for (var y = 0; y < light.Height; y++)
-            for (var x = 0; x < light.Width; x++)
-            {
-                var pixel = pixels[y * light.Width + x];
-                var distance = new Vector2((x - rx) / (float)rx, (y - ry) / (float)ry).LengthSquared();
-                var edge = Math.Clamp((1f - distance) / 0.42f, 0, 1);
-                var warmth = Math.Clamp((pixel.R - pixel.B - 4) / 32f, 0, 1);
-                var brightness = Math.Clamp((pixel.R - unlit.R + 3) / 36f, 0, 1);
-                atlas[(tileY + y) * width + tileX + x] = unlit * (edge * warmth * brightness);
-            }
+                for (var x = 0; x < light.Width; x++)
+                {
+                    var pixel = pixels[y * light.Width + x];
+                    var distance = new Vector2((x - rx) / (float)rx, (y - ry) / (float)ry).LengthSquared();
+                    var edge = Math.Clamp((1f - distance) / 0.42f, 0, 1);
+                    var warmth = Math.Clamp((pixel.R - pixel.B - 4) / 32f, 0, 1);
+                    var brightness = Math.Clamp((pixel.R - unlit.R + 3) / 36f, 0, 1);
+                    atlas[(tileY + y) * width + tileX + x] = unlit * (edge * warmth * brightness);
+                }
         }
 
         flickeringLights = paintedLights.ToArray();
         new Random(112).Shuffle(flickeringLights);
-        var texture = new Texture2D(artwork.GraphicsDevice, width, height);
-        texture.SetData(atlas);
-        return texture;
+        return TextureFactory.FromPixels(artwork.GraphicsDevice, width, height, atlas);
     }
 
+    /// <inheritdoc />
     public void Dispose()
     {
         leaf.Dispose();

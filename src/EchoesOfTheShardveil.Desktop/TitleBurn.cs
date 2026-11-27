@@ -5,10 +5,15 @@ namespace EchoesOfTheShardveil.Desktop;
 /// <summary>Calculates the reveal and backlight for the existing wordmark pixels.</summary>
 internal sealed class TitleBurn
 {
+    /// <summary>The length of the reveal in animation seconds.</summary>
     public const float Duration = 4.4f;
 
     private readonly (int Index, Color Color, float Ignition, float Fill)[] glyphPixels;
 
+    /// <summary>Works out when each visible pixel of the wordmark catches light.</summary>
+    /// <param name="width">The wordmark width in pixels.</param>
+    /// <param name="height">The wordmark height in pixels.</param>
+    /// <param name="wordmark">The wordmark pixels in row-major order, with premultiplied alpha.</param>
     public TitleBurn(int width, int height, Color[] wordmark)
     {
         Face = new Color[wordmark.Length];
@@ -36,9 +41,14 @@ internal sealed class TitleBurn
         glyphPixels = [.. pixels];
     }
 
+    /// <summary>Gets the wordmark as revealed by the last <see cref="Render"/>.</summary>
     public Color[] Face { get; }
+
+    /// <summary>Gets the light leaking through the wordmark as of the last <see cref="Render"/>.</summary>
     public Color[] Light { get; }
 
+    /// <summary>Updates <see cref="Face"/> and <see cref="Light"/> for a moment of the reveal.</summary>
+    /// <param name="time">Animation seconds since the reveal began.</param>
     public void Render(float time)
     {
         var progress = Math.Clamp((time - 0.16f) / 2.75f, 0f, 1f);
@@ -57,6 +67,11 @@ internal sealed class TitleBurn
         }
     }
 
+    /// <summary>Eases from 0 to 1 as a value moves between two points.</summary>
+    /// <param name="start">Where the result is 0.</param>
+    /// <param name="end">Where the result is 1.</param>
+    /// <param name="time">The value to evaluate.</param>
+    /// <returns>A smooth step clamped to the range 0 to 1.</returns>
     public static float Ramp(float start, float end, float time) =>
         MathHelper.SmoothStep(0f, 1f, Math.Clamp((time - start) / (end - start), 0f, 1f));
 }

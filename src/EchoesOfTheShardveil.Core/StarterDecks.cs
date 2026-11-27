@@ -3,7 +3,7 @@ namespace EchoesOfTheShardveil.Core;
 /// <summary>Provides two legal, experimental decks for Alpha.02.</summary>
 public static class StarterDecks
 {
-    private static readonly CardDefinition[] Cards =
+    private static readonly CardDefinition[] CardPool =
     [
         Unit("ember-pup", "Ember Pup", 1, 2, 1, "Beast", CardKeyword.Rush),
         Unit("lantern-squire", "Lantern Squire", 2, 2, 3, "Knight", CardKeyword.Sentinel),
@@ -44,13 +44,26 @@ public static class StarterDecks
     ];
 
     /// <summary>Builds a deck with the same test pool and a different card mix for each side.</summary>
+    /// <param name="secondDeck">
+    /// <see langword="true"/> to build the second side's mix; <see langword="false"/> for the first.
+    /// </param>
+    /// <returns>Three copies of each card in the pool, except for two cards that have two copies.</returns>
     public static IReadOnlyList<CardDefinition> Create(bool secondDeck = false)
     {
-        var reduced = secondDeck ? new[] { "lantern-squire", "bramble-warden" }
-            : new[] { "mistwing-scout", "tusked-charger" };
-        return Cards.SelectMany(card => Enumerable.Repeat(card, reduced.Contains(card.Id) ? 2 : 3)).ToArray();
+        string[] twoCopyIds = secondDeck ? ["lantern-squire", "bramble-warden"]
+            : ["mistwing-scout", "tusked-charger"];
+        return CardPool.SelectMany(card => Enumerable.Repeat(card, twoCopyIds.Contains(card.Id) ? 2 : 3)).ToArray();
     }
 
+    /// <summary>Defines a Unit card without abilities.</summary>
+    /// <param name="id">The stable identifier.</param>
+    /// <param name="name">The player-facing name.</param>
+    /// <param name="cost">The energy cost.</param>
+    /// <param name="power">The combat damage.</param>
+    /// <param name="health">The Health.</param>
+    /// <param name="subtype">The descriptive subtype.</param>
+    /// <param name="keywords">The combat keywords.</param>
+    /// <returns>The card.</returns>
     private static CardDefinition Unit(string id, string name, int cost, int power, int health,
         string subtype, CardKeyword keywords = CardKeyword.None) =>
         new(id, name) { Cost = cost, Power = power, Health = health, Subtype = subtype, Keywords = keywords };

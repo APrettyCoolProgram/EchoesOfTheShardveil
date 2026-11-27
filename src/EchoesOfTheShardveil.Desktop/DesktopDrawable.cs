@@ -14,21 +14,20 @@ internal sealed class DesktopDrawable : IDisposable
     private readonly WindowSizeQuery? getDrawableSize;
     private readonly WindowSizeQuery? getClientSize;
 
+    /// <summary>Initializes the SDL size queries. Without them the window's own bounds are used.</summary>
     public DesktopDrawable()
     {
-        var file = OperatingSystem.IsWindows() ? "SDL2.dll"
-            : OperatingSystem.IsMacOS() ? "libSDL2-2.0.0.dylib" : "libSDL2-2.0.so.0";
-        if (NativeLibrary.TryLoad(file, typeof(Game).Assembly, null, out library))
+        if (SdlLibrary.TryLoad(out library))
         {
             getDrawableSize = LoadQuery("SDL_GL_GetDrawableSize");
             getClientSize = LoadQuery("SDL_GetWindowSize");
         }
     }
 
-    private WindowSizeQuery? LoadQuery(string name) => NativeLibrary.TryGetExport(library, name, out var function)
-        ? Marshal.GetDelegateForFunctionPointer<WindowSizeQuery>(function)
-        : null;
-
+    /// <summary>Resizes the back buffer to the window's pixel size when they differ.</summary>
+    /// <param name="device">The graphics device to resize.</param>
+    /// <param name="window">The game window.</param>
+    /// <returns>The window's client bounds in the units used by mouse positions.</returns>
     public Rectangle Synchronize(GraphicsDevice device, GameWindow window)
     {
         var client = window.ClientBounds;
@@ -70,12 +69,13 @@ internal sealed class DesktopDrawable : IDisposable
         return client;
     }
 
-    public void Dispose()
-    {
-        var handle = Interlocked.Exchange(ref library, 0);
-        if (handle != 0)
-        {
-            NativeLibrary.Free(handle);
-        }
-    }
+    /// <inheritdoc />
+    public void Dispose() => SdlLibrary.Free(ref library);
+
+    /// <summary>Looks up an SDL function that reports a window size.</summary>
+    /// <param name="name">The exported function name.</param>
+    /// <returns>The function, or <see langword="null"/> if SDL does not export it.</returns>
+    private WindowSizeQuery? LoadQuery(string name) => NativeLibrary.TryGetExport(library, name, out var function)
+        ? Marshal.GetDelegateForFunctionPointer<WindowSizeQuery>(function)
+        : null;
 }
