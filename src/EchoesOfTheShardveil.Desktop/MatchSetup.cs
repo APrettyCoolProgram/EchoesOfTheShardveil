@@ -9,7 +9,9 @@ namespace EchoesOfTheShardveil.Desktop;
 /// <param name="Format">The AppData path of the format file.</param>
 /// <param name="Player">The player side's content.</param>
 /// <param name="Opponent">The opponent side's content.</param>
-internal sealed record MatchSetup(string Format, MatchSide Player, MatchSide Opponent)
+/// <param name="Tutorial">The AppData path of the walkthrough, or null to skip it.</param>
+internal sealed record MatchSetup(string Format, MatchSide Player, MatchSide Opponent,
+    string? Tutorial = "Tutorial/Alpha.json")
 {
     private static readonly Lazy<MatchSetup> SinglePlayer = new(Load);
 
@@ -29,10 +31,15 @@ internal sealed record MatchSetup(string Format, MatchSide Player, MatchSide Opp
     {
         var path = AppDataJson.PathFor("Match", "AlphaSinglePlayer.json");
         var setup = AppDataJson.Load<MatchSetup>(path);
-        if (string.IsNullOrWhiteSpace(setup.Format) || setup.Player is not { IsComplete: true } ||
+        if (string.IsNullOrWhiteSpace(setup.Format) ||
+            setup.Player is not { IsComplete: true } ||
             setup.Opponent is not { IsComplete: true })
         {
             throw new InvalidDataException($"'{path}' must specify a format, deck, character, portrait and playmat for the matchup.");
+        }
+        if (setup.Tutorial is not null && string.IsNullOrWhiteSpace(setup.Tutorial))
+        {
+            throw new InvalidDataException($"'{path}' must use a tutorial path or null.");
         }
         return setup;
     }

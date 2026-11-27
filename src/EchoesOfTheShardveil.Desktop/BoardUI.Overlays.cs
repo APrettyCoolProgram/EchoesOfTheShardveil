@@ -17,7 +17,7 @@ internal sealed partial class BoardUI
     private static readonly Tooltip HealthTooltip =
         new("HEALTH", "Your Hero's remaining Health. Units and effects reduce it, and you lose at 0.");
     private static readonly Tooltip WellTooltip =
-        new("WELL", "Shards in your Well. Each one refills at the start of your turn and pays 1 energy. Once per turn, drag a card onto your portrait to add a shard.");
+        new("WELL", "Shards in your Well. Each one refills at the start of your turn and pays 1 energy. During Main, drag a card onto your portrait to add a shard when the Well can be fed.");
     private static readonly Tooltip OpponentHealthTooltip =
         new("OPPONENT", "Their remaining Health. Attack this portrait to reduce it.");
     private static readonly Tooltip OpponentWellTooltip =
@@ -25,7 +25,7 @@ internal sealed partial class BoardUI
     private static readonly Tooltip DiscardTooltip =
         new("DISCARD", "Cards in your discard pile: used Spells, destroyed Units, and cards discarded to the hand limit.");
     private static readonly Tooltip DeckTooltip =
-        new("DECK", "Cards left in your deck. You draw one at the start of each turn, and you lose if you must draw from an empty deck.");
+        new("DECK", "Cards left in your deck. You lose if you must draw from an empty deck.");
     private static readonly Tooltip RemovedTooltip =
         new("REMOVED", "Cards removed from the game. They can't return. No cards use this yet.");
 
@@ -78,14 +78,14 @@ internal sealed partial class BoardUI
         FillRectangle(FullWidth(0, layoutHeight), new Color(0, 0, 0) * 0.75f);
         DrawBox(CenterInWindow(TutorialPanel), OverlayFill, OverlayEdge);
         var left = CenterInWindow(TutorialPanel).X + 36;
-        if (tutorial.IsPrompt)
+        if (tutorial.IsPrompt && BoardTutorial.Prompt is { } prompt)
         {
-            DrawText("BEFORE THE DUEL", left, 161 + TutorialOffset, 21, Teal);
-            DrawText("Want to learn the rules?", left, 207 + TutorialOffset, 43, Ivory);
-            DrawText("Learn the board layout, card details, and rules of a duel.", left, 280 + TutorialOffset, 23, Muted);
-            DrawText("You can skip the guide and go straight to your opening hand.", left, 325 + TutorialOffset, 21, Muted);
-            DrawButton(CenterInWindow(TutorialSkip), "Skip for now", false, quiet: true);
-            DrawButton(CenterInWindow(TutorialNext), "Learn the rules", true);
+            DrawText(prompt.Label, left, 161 + TutorialOffset, 21, Teal);
+            DrawText(prompt.Title, left, 207 + TutorialOffset, 43, Ivory);
+            DrawText(prompt.Description, left, 280 + TutorialOffset, 23, Muted);
+            DrawText(prompt.SkipHint, left, 325 + TutorialOffset, 21, Muted);
+            DrawButton(CenterInWindow(TutorialSkip), prompt.SkipButton, false, quiet: true);
+            DrawButton(CenterInWindow(TutorialNext), prompt.StartButton, true);
             return;
         }
 
@@ -106,11 +106,11 @@ internal sealed partial class BoardUI
             case TutorialIllustration.Board:
                 DrawTutorialBoard(left, 254 + TutorialOffset);
                 break;
-            case TutorialIllustration.Card:
+            case TutorialIllustration.Card when lesson.ExampleCard is { } card:
                 var example = CardBounds(left + 12, 245 + TutorialOffset, 135);
-                var card = BoardTutorial.ExampleCard;
-                DrawCard(example, card, false, new(card, card.Power, card.Health, false, true, false));
-                DrawCenteredText("EXAMPLE UNIT", example.Center.X, example.Bottom + 8, 14, Muted);
+                DrawCard(example, card, false);
+                DrawCenteredText($"EXAMPLE {card.Type.ToString().ToUpperInvariant()}", example.Center.X,
+                    example.Bottom + 8, 14, Muted);
                 break;
         }
         DrawTutorialPoints(lesson.Points, pointsX, lineWidth);
@@ -125,7 +125,10 @@ internal sealed partial class BoardUI
                     i <= tutorial.PageIndex ? Teal : Border);
             }
         }
-        DrawButton(CenterInWindow(TutorialBack), "Back", false, quiet: true);
+        if (tutorial.CanGoBack)
+        {
+            DrawButton(CenterInWindow(TutorialBack), "Back", false, quiet: true);
+        }
         DrawButton(CenterInWindow(TutorialSkip), "Skip guide", false, quiet: true);
         DrawButton(CenterInWindow(TutorialNext), tutorial.IsLastPage ? "Start duel" : "Next", true);
     }

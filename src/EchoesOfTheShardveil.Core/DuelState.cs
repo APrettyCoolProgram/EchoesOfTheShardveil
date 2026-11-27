@@ -10,7 +10,7 @@ public enum DuelPhase
     Mulligan,
     /// <summary>The active player refills the Well, readies Units and resolves start-of-turn abilities.</summary>
     Ready,
-    /// <summary>The active player draws a card.</summary>
+    /// <summary>The active player resolves the regular draw for the turn.</summary>
     Draw,
     /// <summary>The active player feeds the Well, uses the Spark and plays cards.</summary>
     Main,

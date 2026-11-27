@@ -1,6 +1,7 @@
 // 261127_code
 // 261127_documentation
 
+using System.Collections.Concurrent;
 using EchoesOfTheShardveil.Core;
 
 namespace EchoesOfTheShardveil.Desktop;
@@ -8,11 +9,27 @@ namespace EchoesOfTheShardveil.Desktop;
 /// <summary>Loads card definitions from an AppData set file for use by the desktop game.</summary>
 internal static class CardSet
 {
+    private static readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, CardDefinition>> Sets =
+        new(StringComparer.Ordinal);
+
     /// <summary>Reads the named set and indexes its cards by their stable IDs.</summary>
     /// <param name="setName">The name shared by the set folder and its .cards file.</param>
     /// <returns>The set's cards keyed by ID.</returns>
     /// <exception cref="InvalidDataException">The file does not contain a valid card set.</exception>
     public static IReadOnlyDictionary<string, CardDefinition> Load(string setName)
+    {
+        if (string.IsNullOrWhiteSpace(setName) || setName is "." or ".." ||
+            setName.IndexOfAny(['/', '\\', ':']) >= 0)
+        {
+            throw new InvalidDataException($"Invalid card set name '{setName}'.");
+        }
+        return Sets.GetOrAdd(setName, Read);
+    }
+
+    /// <summary>Reads and validates a set that has not been loaded yet.</summary>
+    /// <param name="setName">The set name.</param>
+    /// <returns>The set's cards keyed by ID.</returns>
+    private static IReadOnlyDictionary<string, CardDefinition> Read(string setName)
     {
         var path = AppDataJson.PathFor("Set", setName, setName + ".cards");
         var set = AppDataJson.Load<SetData>(path);

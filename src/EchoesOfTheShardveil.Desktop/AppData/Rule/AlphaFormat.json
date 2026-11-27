@@ -6,5 +6,11 @@
   "handLimit": 10,
   "secondPlayerGetsSpark": true,
   "unitSlots": 5,
-  "relicSlots": 2
+  "relicSlots": 2,
+  "wellLimit": 10,
+  "firstPlayerSkipsFirstDraw": true,
+  "sparkEnergy": 1,
+  "cardsDrawnPerTurn": 1,
+  "wellFeedsPerTurn": 1,
+  "mulliganSwapLimit": null
 }

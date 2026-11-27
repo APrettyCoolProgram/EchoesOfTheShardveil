@@ -72,7 +72,7 @@ internal static class SinglePlayerOpponent
         foreach (var slot in Enumerable.Range(0, hand.Count).OrderByDescending(index => hand[index].Cost))
         {
             var card = hand[slot];
-            if (card.Cost > energy + (own.HasSpark ? 1 : 0)
+            if (card.Cost > energy + (own.HasSpark ? duel.Format.SparkEnergy : 0)
                 || (card.Type == CardType.Unit && own.Units.All(unit => unit is not null))
                 || (card.Type == CardType.Relic && own.Relics.All(relic => relic is not null)))
             {

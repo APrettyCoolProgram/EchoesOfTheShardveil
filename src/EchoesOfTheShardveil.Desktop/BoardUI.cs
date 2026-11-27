@@ -356,7 +356,7 @@ internal sealed partial class BoardUI : IDisposable
         {
             tutorial.Close();
         }
-        else if (!tutorial.IsPrompt && CenterInWindow(TutorialBack).Contains(position))
+        else if (tutorial.CanGoBack && CenterInWindow(TutorialBack).Contains(position))
         {
             tutorial.Back();
         }
@@ -392,9 +392,22 @@ internal sealed partial class BoardUI : IDisposable
     /// <param name="handSlot">The clicked hand slot.</param>
     private void ClickHandCard(int handSlot)
     {
-        if (duel.Phase == DuelPhase.Mulligan && !mulliganSlots.Add(handSlot))
+        if (duel.Phase == DuelPhase.Mulligan)
         {
-            mulliganSlots.Remove(handSlot);
+            if (mulliganSlots.Remove(handSlot))
+            {
+                message = "";
+            }
+            else if (mulliganSlots.Count < duel.Format.MaxMulliganSwaps)
+            {
+                mulliganSlots.Add(handSlot);
+                message = "";
+            }
+            else
+            {
+                message = duel.Format.MaxMulliganSwaps == 0 ? "This format keeps the opening hand."
+                    : $"You may replace up to {duel.Format.MaxMulliganSwaps} opening cards.";
+            }
         }
         if (duel.ActivePlayer == Human && duel.Phase == DuelPhase.End)
         {
@@ -463,7 +476,7 @@ internal sealed partial class BoardUI : IDisposable
                 else if (AnchorBottomLeft(SparkButton).Contains(position) && humanView.HasSpark)
                 {
                     duel.UseSpark(Human);
-                    message = "Spark added 1 temporary energy.";
+                    message = $"Spark added {duel.Format.SparkEnergy} temporary energy.";
                 }
                 break;
             case DuelPhase.Battle:

@@ -27,7 +27,7 @@ public sealed class Duel
     /// <summary>The default number of Relic slots on each side.</summary>
     public const int RelicSlots = 2;
 
-    /// <summary>The most shards a Well can hold. No card or ability can cost more.</summary>
+    /// <summary>The default Well capacity and maximum energy cost.</summary>
     public const int WellLimit = 10;
 
     /// <summary>The default copy limit for each card name.</summary>
@@ -37,7 +37,6 @@ public sealed class Duel
 
     private readonly Player[] players;
     private readonly Random random;
-    private readonly int firstPlayer;
 
     /// <summary>Validates and shuffles both decks, chooses the first player, and deals opening hands.</summary>
     /// <param name="playerOneDeck">The deck of the player at index 0.</param>
@@ -65,7 +64,7 @@ public sealed class Duel
             new(playerTwoLeader ?? new("leader-two", "Leader Two") { Type = CardType.Leader },
                 ValidateDeck(playerTwoDeck), Format),
         ];
-        firstPlayer = random.Next(players.Length);
+        var firstPlayer = random.Next(players.Length);
         ActivePlayer = firstPlayer;
         players[1 - firstPlayer].HasSpark = Format.SecondPlayerGetsSpark;
         foreach (var player in players)
@@ -115,7 +114,7 @@ public sealed class Duel
     /// <exception cref="InvalidOperationException">
     /// Thrown when setup is over or the player already chose their opening hand.
     /// </exception>
-    /// <exception cref="ArgumentException">Thrown when the slots repeat or are not in the hand.</exception>
+    /// <exception cref="ArgumentException">Thrown when the slots are invalid or exceed the mulligan limit.</exception>
     public void Mulligan(int player, IEnumerable<int> handSlots)
     {
         Require(Phase == DuelPhase.Mulligan, "Mulligans are only available during setup.");
@@ -151,7 +150,7 @@ public sealed class Duel
         {
             case DuelPhase.Ready:
                 owner.ReadyShards = owner.Well.Count;
-                owner.FedWell = false;
+                owner.WellFeedsThisTurn = 0;
                 foreach (var unit in owner.Units.OfType<Unit>())
                 {
                     unit.Exhausted = false;
@@ -160,9 +159,9 @@ public sealed class Duel
                 SetNextPhase(DuelPhase.Draw);
                 break;
             case DuelPhase.Draw:
-                if (Turn != 1 || player != firstPlayer)
+                if (!Format.FirstPlayerSkipsFirstDraw || Turn != 1)
                 {
-                    Draw(owner, 1);
+                    Draw(owner, Format.CardsDrawnPerTurn);
                 }
                 SetNextPhase(DuelPhase.Main);
                 break;
@@ -217,7 +216,7 @@ public sealed class Duel
         owner.Well.Add(GetHandCard(owner, handSlot));
         owner.Hand.RemoveAt(handSlot);
         owner.ReadyShards++;
-        owner.FedWell = true;
+        owner.WellFeedsThisTurn++;
     }
 
     /// <summary>Spends the second player's once-per-duel Spark during Main.</summary>
@@ -230,7 +229,7 @@ public sealed class Duel
         var owner = RequirePhase(player, DuelPhase.Main);
         Require(owner.HasSpark, "That player has no Spark left.");
         owner.HasSpark = false;
-        owner.TemporaryEnergy++;
+        owner.TemporaryEnergy += Format.SparkEnergy;
     }
 
     /// <summary>Lists available placements and targets without changing the duel.</summary>
@@ -440,7 +439,8 @@ public sealed class Duel
     /// <summary>Determines whether a player's Well can still be fed this turn.</summary>
     /// <param name="owner">The player.</param>
     /// <returns><see langword="true"/> if the Well has room and was not fed this turn.</returns>
-    private static bool CanReceiveShard(Player owner) => !owner.FedWell && owner.Well.Count < WellLimit;
+    private bool CanReceiveShard(Player owner) =>
+        owner.WellFeedsThisTurn < Format.WellFeedsPerTurn && owner.Well.Count < Format.WellLimit;
 
     /// <summary>Takes a public snapshot of a Unit.</summary>
     /// <param name="player">The index of the Unit's controller.</param>
@@ -762,10 +762,14 @@ public sealed class Duel
     /// <param name="owner">The player.</param>
     /// <param name="handSlots">The chosen slots.</param>
     /// <returns>The slots as an array.</returns>
-    /// <exception cref="ArgumentException">Thrown when the slots repeat or are not in the hand.</exception>
-    private static int[] ValidateMulliganSlots(Player owner, IEnumerable<int> handSlots)
+    /// <exception cref="ArgumentException">Thrown when the slots are invalid or exceed the mulligan limit.</exception>
+    private int[] ValidateMulliganSlots(Player owner, IEnumerable<int> handSlots)
     {
         var slots = handSlots.ToArray();
+        if (slots.Length > Format.MaxMulliganSwaps)
+        {
+            throw new ArgumentException($"You may replace at most {Format.MaxMulliganSwaps} opening cards.", nameof(handSlots));
+        }
         if (slots.Distinct().Count() != slots.Length || slots.Any(slot => (uint)slot >= owner.Hand.Count))
         {
             throw new ArgumentException("Choose distinct slots from the opening hand.", nameof(handSlots));
@@ -776,11 +780,17 @@ public sealed class Duel
     /// <summary>Checks whether a card definition can be included in a deck.</summary>
     /// <param name="card">The card to check.</param>
     /// <returns>Whether the card has a playable type and valid stats and abilities.</returns>
-    public static bool IsPlayableCard(CardDefinition card) =>
+    public static bool IsPlayableCard(CardDefinition card) => IsPlayableCard(card, DefaultFormat);
+
+    /// <summary>Checks the card's type, stats and costs against the supplied format.</summary>
+    /// <param name="card">The card to check.</param>
+    /// <param name="format">The format whose Well capacity limits costs.</param>
+    /// <returns>Whether the card can be included in a deck for that format.</returns>
+    public static bool IsPlayableCard(CardDefinition card, DuelFormat format) =>
         card.Type is CardType.Unit or CardType.Spell or CardType.Relic &&
-        card.Cost is >= 0 and <= WellLimit &&
+        card.Cost >= 0 && card.Cost <= format.WellLimit &&
         (card.Type != CardType.Unit || (card.Power >= 0 && card.Health > 0)) &&
-        card.Abilities.All(ability => ability.Amount >= 0 && ability.Cost is >= 0 and <= WellLimit);
+        card.Abilities.All(ability => ability.Amount >= 0 && ability.Cost >= 0 && ability.Cost <= format.WellLimit);
 
     /// <summary>Checks the deck rules and copies the deck.</summary>
     /// <param name="deck">The cards supplied by the caller.</param>
@@ -790,7 +800,7 @@ public sealed class Duel
     {
         var cards = deck.ToList();
         if (cards.Count != Format.DeckSize ||
-            cards.Any(card => !IsPlayableCard(card)) ||
+            cards.Any(card => !IsPlayableCard(card, Format)) ||
             cards.GroupBy(card => card.Name, StringComparer.OrdinalIgnoreCase)
                 .Any(group => group.Count() > Format.MaxCopiesPerName))
         {
@@ -855,8 +865,8 @@ public sealed class Duel
         /// <summary>Gets or sets whether the Spark is still unused.</summary>
         public bool HasSpark { get; set; }
 
-        /// <summary>Gets or sets whether the Well was fed this turn.</summary>
-        public bool FedWell { get; set; }
+        /// <summary>Gets or sets how many times this player fed the Well this turn.</summary>
+        public int WellFeedsThisTurn { get; set; }
 
         /// <summary>Gets or sets whether the opening hand has been chosen.</summary>
         public bool MulliganComplete { get; set; }

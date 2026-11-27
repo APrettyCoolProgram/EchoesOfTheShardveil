@@ -1,5 +1,13 @@
 {
-  "exampleCardId": "mistwing-scout",
+  "showPrompt": true,
+  "prompt": {
+    "label": "BEFORE THE DUEL",
+    "title": "Want to learn the rules?",
+    "description": "Learn the board layout, card details, and rules of a duel.",
+    "skipHint": "You can skip the guide and go straight to your opening hand.",
+    "skipButton": "Skip for now",
+    "startButton": "Learn the rules"
+  },
   "pages": [
     {
       "title": "Win the duel",
@@ -41,7 +49,9 @@
         "The name is directly beneath it. The rules area shows keywords, like Elusive, or a short ability summary.",
         "A Unit's bottom-left numbers are Power / Health. On the board, Health is the amount remaining after damage."
       ],
-      "illustration": "Card"
+      "illustration": "Card",
+      "exampleCardSet": "Alpha",
+      "exampleCardId": "mistwing-scout"
     },
     {
       "title": "Read the marks",
@@ -55,14 +65,14 @@
       "title": "Choose an opening hand",
       "points": [
         "Each deck has {deckSize} cards, with up to {maxCopiesPerName} copies of a card by name. Each player draws {openingHandSize} cards.",
-        "Click any cards you want to replace, then confirm. They go to the bottom of your deck in random order before you draw replacements.",
-        "A random player goes first and skips their first draw. When the format grants a Spark, the second player can spend it for one temporary energy."
+        "You can replace up to {maxMulliganSwaps} cards. Select your swaps, then confirm. They go to the bottom of your deck in random order before you draw replacements.",
+        "A random player goes first. The format decides whether they skip their first draw and whether the second player gets a Spark."
       ]
     },
     {
       "title": "Follow the turn",
       "points": [
-        "Ready refills your Well and readies your exhausted Units. Then Draw gives you one card.",
+        "Ready refills your Well and readies your exhausted Units. In the regular Draw phase, draw {cardsDrawnPerTurn} from your deck.",
         "In Main, feed the Well, use Spark if available, and play cards. In Battle, attack one Unit at a time or skip combat.",
         "At End, discard to {handLimit} cards if needed. Temporary energy expires and the other player takes their turn."
       ]
@@ -70,9 +80,9 @@
     {
       "title": "Power your cards",
       "points": [
-        "Once during Main, drag any hand card onto your Hero portrait to feed the Well. It becomes a face-down shard and gives you one energy immediately.",
-        "Each ready shard pays for one energy. Your shards refill on your next Ready phase. Unspent energy does not carry over.",
-        "Use Spark once during your Main phase if you have it. The extra energy lasts for that turn only."
+        "Drag a hand card onto your Hero portrait during Main to turn it into a ready shard. The feed limit per turn is {wellFeedsPerTurn}.",
+        "The Well holds up to {wellLimit} shards. Each ready shard pays for one energy. Shards refill on your next Ready phase.",
+        "If you have a Spark, use it once during your Main phase for {sparkEnergy} temporary energy. The extra energy lasts for that turn only."
       ]
     },
     {
@@ -86,7 +96,7 @@
     {
       "title": "Use the action row",
       "points": [
-        "In Main, drag a card onto your portrait for energy or to a highlighted slot to play it. Use Spark adds 1 energy when available. Go to battle ends Main.",
+        "In Main, drag a card onto your portrait for energy or to a highlighted slot to play it. Use Spark adds {sparkEnergy} energy when available. Go to battle ends Main.",
         "During combat, click a Unit or the Opponent portrait to target it. Take the hit declines interception. End battle moves to End.",
         "Use Cancel selection to clear a card or target choice. At End, Discard if above the limit, then click End turn."
       ]

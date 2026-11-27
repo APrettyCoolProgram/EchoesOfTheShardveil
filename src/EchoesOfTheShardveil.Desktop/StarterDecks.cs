@@ -8,8 +8,6 @@ namespace EchoesOfTheShardveil.Desktop;
 /// <summary>Loads the starter deck recipes and resolves their card IDs.</summary>
 internal static class StarterDecks
 {
-    private static readonly Lazy<IReadOnlyDictionary<string, CardDefinition>> Alpha =
-        new(() => CardSet.Load("Alpha"));
     private static readonly Lazy<LoadedDeck> Player = new(() => Load(MatchSetup.Current.Player.Deck));
     private static readonly Lazy<LoadedDeck> Opponent = new(() => Load(MatchSetup.Current.Opponent.Deck));
 
@@ -20,14 +18,7 @@ internal static class StarterDecks
         (CardDefinition[])(secondDeck ? Opponent.Value : Player.Value).Cards.Clone();
 
     /// <summary>Gets the playable card pool from the set named in the player recipe.</summary>
-    public static IEnumerable<CardDefinition> PlayerPool => Player.Value.Pool.Values.Where(Duel.IsPlayableCard);
-
-    /// <summary>Looks up an Alpha card used by the tutorial.</summary>
-    /// <param name="id">The card's stable ID.</param>
-    /// <returns>The loaded card definition.</returns>
-    public static CardDefinition GetCard(string id) => Alpha.Value.TryGetValue(id, out var card)
-        ? card
-        : throw new InvalidDataException($"Alpha.cards is missing the required card '{id}'.");
+    public static IEnumerable<CardDefinition> PlayerPool => Player.Value.Pool.Values.Where(card => Duel.IsPlayableCard(card, MatchFormats.Active));
 
     /// <summary>Reads a recipe and verifies its references and copy counts.</summary>
     /// <param name="file">The AppData-relative recipe path.</param>
@@ -36,30 +27,30 @@ internal static class StarterDecks
     {
         var path = AppDataJson.ResolveReference(file);
         var recipe = AppDataJson.Load<DeckRecipe>(path);
-        if (string.IsNullOrWhiteSpace(recipe.Set) || recipe.Set.IndexOfAny(['/', '\\']) >= 0 ||
-            recipe.Set is "." or ".." || recipe.Cards is null)
+        if (string.IsNullOrWhiteSpace(recipe.Set) || recipe.Cards is null)
         {
             throw new InvalidDataException($"'{path}' must specify a set name and card list.");
         }
 
-        var pool = recipe.Set == "Alpha" ? Alpha.Value : CardSet.Load(recipe.Set);
+        var pool = CardSet.Load(recipe.Set);
+        var format = MatchFormats.Active;
         var cards = new List<CardDefinition>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in recipe.Cards)
         {
             if (entry is null || string.IsNullOrWhiteSpace(entry.Id) || !pool.TryGetValue(entry.Id, out var card) ||
-                !Duel.IsPlayableCard(card) || !seen.Add(entry.Id) || entry.Copies < 1 || entry.Copies > MatchFormats.Active.MaxCopiesPerName)
+                !Duel.IsPlayableCard(card, format) || !seen.Add(entry.Id) || entry.Copies < 1 || entry.Copies > format.MaxCopiesPerName)
             {
                 throw new InvalidDataException($"'{path}' has an invalid deck entry for '{entry?.Id}'.");
             }
             cards.AddRange(Enumerable.Repeat(card, entry.Copies));
         }
-        if (cards.Count != MatchFormats.Active.DeckSize)
+        if (cards.Count != format.DeckSize)
         {
-            throw new InvalidDataException($"'{path}' must contain exactly {MatchFormats.Active.DeckSize} cards.");
+            throw new InvalidDataException($"'{path}' must contain exactly {format.DeckSize} cards.");
         }
         if (cards.GroupBy(card => card.Name, StringComparer.OrdinalIgnoreCase)
-            .Any(group => group.Count() > MatchFormats.Active.MaxCopiesPerName))
+            .Any(group => group.Count() > format.MaxCopiesPerName))
         {
             throw new InvalidDataException($"'{path}' exceeds the copy limit for a card name.");
         }
