@@ -13,8 +13,11 @@ internal sealed class DeckbuilderUI : IScreen
     private const int Width = 1120;
     private const int Height = 760;
     private const int RowHeight = 35;
+    private const int VisibleRows = 14;
     private static readonly Rectangle Back = new(28, 28, 140, 42);
     private static readonly Rectangle Collection = new(28, 94, 668, 574);
+    private static readonly Rectangle PreviousCards = new(600, 107, 36, 29);
+    private static readonly Rectangle NextCards = new(644, 107, 36, 29);
     private static readonly Rectangle Details = new(714, 94, 378, 408);
     private static readonly Rectangle Deck = new(714, 520, 378, 148);
     private static readonly Rectangle Restore = new(714, 688, 172, 44);
@@ -34,17 +37,18 @@ internal sealed class DeckbuilderUI : IScreen
     private readonly int[] copies;
     private int[] activeCopies;
     private int selected;
+    private int firstVisible;
     private Point? pointer;
     private string[] rules = [];
     private string status = "";
 
-    /// <summary>Builds an editable list from the starter card pool.</summary>
+    /// <summary>Builds an editable list from the player starter deck's set.</summary>
     /// <param name="services">Shared graphics and audio resources.</param>
     public DeckbuilderUI(GameServices services)
     {
         this.services = services;
         controls = new WindowControls(services.Audio, isBoard: false);
-        cards = starter.DistinctBy(card => card.Id).OrderBy(card => card.Cost).ThenBy(card => card.Name).ToArray();
+        cards = StarterDecks.PlayerPool.OrderBy(card => card.Cost).ThenBy(card => card.Name).ToArray();
         copies = new int[cards.Length];
         ActiveDeck = starter;
         RestoreStarter();
@@ -58,6 +62,8 @@ internal sealed class DeckbuilderUI : IScreen
     /// <summary>Gets the deck to use when starting the next duel.</summary>
     public IReadOnlyList<CardDefinition> ActiveDeck { get; private set; }
 
+    private int MaximumOffset => Math.Max(0, cards.Length - VisibleRows);
+    private int VisibleEnd => Math.Min(firstVisible + VisibleRows, cards.Length);
     private int CardCount => copies.Sum();
     private bool CanApply => CardCount == MatchFormats.Alpha.DeckSize && !copies.SequenceEqual(activeCopies);
 
@@ -104,6 +110,11 @@ internal sealed class DeckbuilderUI : IScreen
                 }
                 Edit(position);
             }
+        }
+
+        if (!controls.IsConfirming && pointer is { } scrollPosition && Collection.Contains(scrollPosition))
+        {
+            ScrollCards(frame.ScrollDirection);
         }
 
         return ScreenTransition.None;
@@ -162,11 +173,19 @@ internal sealed class DeckbuilderUI : IScreen
             activeCopies = (int[])copies.Clone();
             status = "Deck ready for Single player.";
         }
+        else if (PreviousCards.Contains(position))
+        {
+            ScrollCards(-VisibleRows);
+        }
+        else if (NextCards.Contains(position))
+        {
+            ScrollCards(VisibleRows);
+        }
         else
         {
-            for (var index = 0; index < cards.Length; index++)
+            for (var index = firstVisible; index < VisibleEnd; index++)
             {
-                var row = Row(index);
+                var row = Row(index - firstVisible);
                 if (!row.Contains(position))
                 {
                     continue;
@@ -178,7 +197,7 @@ internal sealed class DeckbuilderUI : IScreen
                     copies[index]--;
                     status = "";
                 }
-                if (AddButton(row).Contains(position) && copies[index] < MatchFormats.Alpha.MaxCopiesPerName && CardCount < MatchFormats.Alpha.DeckSize)
+                if (AddButton(row).Contains(position) && CanAdd(index, CardCount))
                 {
                     copies[index]++;
                     status = "";
@@ -187,6 +206,19 @@ internal sealed class DeckbuilderUI : IScreen
             }
         }
     }
+
+    /// <summary>Moves the first visible collection row within the available range.</summary>
+    /// <param name="rows">The signed number of rows to move.</param>
+    private void ScrollCards(int rows) => firstVisible = Math.Clamp(firstVisible + rows, 0, MaximumOffset);
+
+    /// <summary>Checks the deck size and the combined copy count across cards with the same name.</summary>
+    /// <param name="index">The card to add.</param>
+    /// <param name="count">The current draft size.</param>
+    /// <returns>Whether another copy can be added.</returns>
+    private bool CanAdd(int index, int count) =>
+        count < MatchFormats.Alpha.DeckSize &&
+        copies.Where((_, other) => StringComparer.OrdinalIgnoreCase.Equals(cards[index].Name, cards[other].Name))
+            .Sum() < MatchFormats.Alpha.MaxCopiesPerName;
 
     /// <summary>Resets the draft to the original starter composition.</summary>
     private void RestoreStarter()
@@ -214,10 +246,17 @@ internal sealed class DeckbuilderUI : IScreen
         Text("Name", 111, 143, 17, Muted);
         Text("Type", 423, 143, 17, Muted);
         Text("Copies", 575, 143, 17, Muted);
-        var count = CardCount;
-        for (var index = 0; index < cards.Length; index++)
+        if (MaximumOffset > 0)
         {
-            var row = Row(index);
+            Text($"{firstVisible + 1}-{VisibleEnd} of {cards.Length}", 439, 111, 18, Muted);
+            Button(PreviousCards, "<", firstVisible > 0);
+            Button(NextCards, ">", firstVisible < MaximumOffset);
+        }
+
+        var count = CardCount;
+        for (var index = firstVisible; index < VisibleEnd; index++)
+        {
+            var row = Row(index - firstVisible);
             var card = cards[index];
             Fill(row, index == selected ? Teal : new Color(29, 43, 51));
             if (index == selected)
@@ -230,7 +269,7 @@ internal sealed class DeckbuilderUI : IScreen
             Text(card.Type.ToString(), 423, row.Top + 6, 20, Muted);
             Text($"{copies[index]}", 595, row.Top + 5, 22, UiColors.Ivory);
             Button(RemoveButton(row), "-", copies[index] > 0);
-            Button(AddButton(row), "+", count < MatchFormats.Alpha.DeckSize && copies[index] < MatchFormats.Alpha.MaxCopiesPerName);
+            Button(AddButton(row), "+", CanAdd(index, count));
         }
     }
 

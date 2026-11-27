@@ -29,9 +29,6 @@ internal sealed partial class BoardUI
     private static readonly Tooltip RemovedTooltip =
         new("REMOVED", "Cards removed from the game. They can't return. No cards use this yet.");
 
-    private static readonly CardDefinition TutorialUnit =
-        StarterDecks.GetCard("mistwing-scout");
-
     /// <summary>Draws help for the badge or counter under the pointer.</summary>
     private void DrawBadgeTooltip()
     {
@@ -111,16 +108,22 @@ internal sealed partial class BoardUI
                 break;
             case TutorialIllustration.Card:
                 var example = CardBounds(left + 12, 245 + TutorialOffset, 135);
-                DrawCard(example, TutorialUnit, false, new(TutorialUnit, TutorialUnit.Power, 1, false, true, false));
+                var card = BoardTutorial.ExampleCard;
+                DrawCard(example, card, false, new(card, card.Power, card.Health, false, true, false));
                 DrawCenteredText("EXAMPLE UNIT", example.Center.X, example.Bottom + 8, 14, Muted);
                 break;
         }
         DrawTutorialPoints(lesson.Points, pointsX, lineWidth);
 
         var progressY = 503 + TutorialOffset;
-        for (var i = 0; i < BoardTutorial.Pages.Count; i++)
+        var progressStep = Math.Min(30, 390 / BoardTutorial.Pages.Count);
+        if (progressStep >= 2)
         {
-            FillRectangle(new(left + i * 30, progressY, 23, 3), i <= tutorial.PageIndex ? Teal : Border);
+            for (var i = 0; i < BoardTutorial.Pages.Count; i++)
+            {
+                FillRectangle(new(left + i * progressStep, progressY, Math.Min(23, progressStep - 1), 3),
+                    i <= tutorial.PageIndex ? Teal : Border);
+            }
         }
         DrawButton(CenterInWindow(TutorialBack), "Back", false, quiet: true);
         DrawButton(CenterInWindow(TutorialSkip), "Skip guide", false, quiet: true);

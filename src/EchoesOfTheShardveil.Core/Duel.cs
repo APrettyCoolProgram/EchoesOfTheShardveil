@@ -761,6 +761,15 @@ public sealed class Duel
         return slots;
     }
 
+    /// <summary>Checks whether a card definition can be included in a deck.</summary>
+    /// <param name="card">The card to check.</param>
+    /// <returns>Whether the card has a playable type and valid stats and abilities.</returns>
+    public static bool IsPlayableCard(CardDefinition card) =>
+        card.Type is CardType.Unit or CardType.Spell or CardType.Relic &&
+        card.Cost is >= 0 and <= WellLimit &&
+        (card.Type != CardType.Unit || (card.Power >= 0 && card.Health > 0)) &&
+        card.Abilities.All(ability => ability.Amount >= 0 && ability.Cost is >= 0 and <= WellLimit);
+
     /// <summary>Checks the deck rules and copies the deck.</summary>
     /// <param name="deck">The cards supplied by the caller.</param>
     /// <returns>A copy the duel can change freely.</returns>
@@ -769,9 +778,7 @@ public sealed class Duel
     {
         var cards = deck.ToList();
         if (cards.Count != format.DeckSize ||
-            cards.Any(card => card.Type is not (CardType.Unit or CardType.Spell or CardType.Relic)
-                || card.Cost is < 0 or > WellLimit || (card.Type == CardType.Unit && (card.Power < 0 || card.Health <= 0))
-                || card.Abilities.Any(ability => ability.Amount < 0 || ability.Cost is < 0 or > WellLimit)) ||
+            cards.Any(card => !IsPlayableCard(card)) ||
             cards.GroupBy(card => card.Name, StringComparer.OrdinalIgnoreCase)
                 .Any(group => group.Count() > format.MaxCopiesPerName))
         {
