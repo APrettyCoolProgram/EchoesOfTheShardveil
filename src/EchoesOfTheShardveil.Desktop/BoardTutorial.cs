@@ -73,10 +73,10 @@ internal sealed class BoardTutorial
             ("{startingHealth}", format.StartingHealth),
             ("{deckSize}", format.DeckSize),
             ("{maxCopiesPerName}", format.MaxCopiesPerName),
-            ("{openingHandSize}", Duel.OpeningHandSize),
-            ("{unitSlots}", Duel.UnitSlots),
-            ("{relicSlots}", Duel.RelicSlots),
-            ("{handLimit}", Duel.HandLimit),
+            ("{openingHandSize}", format.OpeningHandSize),
+            ("{unitSlots}", format.UnitSlots),
+            ("{relicSlots}", format.RelicSlots),
+            ("{handLimit}", format.HandLimit),
         };
         var pages = tutorial.Pages.Select(page => page with
         {

@@ -1,5 +1,10 @@
 {
   "startingHealth": 20,
   "deckSize": 40,
-  "maxCopiesPerName": 3
+  "maxCopiesPerName": 3,
+  "openingHandSize": 5,
+  "handLimit": 10,
+  "secondPlayerGetsSpark": true,
+  "unitSlots": 5,
+  "relicSlots": 2
 }

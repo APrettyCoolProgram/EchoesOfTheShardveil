@@ -111,7 +111,7 @@ internal sealed partial class BoardUI
             DrawText($"+{view.TemporaryEnergy} ENERGY", 28, statusY + 18, 12, Gold);
         }
 
-        for (var i = 0; i < Duel.UnitSlots; i++)
+        for (var i = 0; i < view.Units.Count; i++)
         {
             var bounds = UnitBounds(player, i);
             if (view.Units[i] is { } unit)
@@ -125,7 +125,7 @@ internal sealed partial class BoardUI
             }
         }
 
-        for (var i = 0; i < Duel.RelicSlots; i++)
+        for (var i = 0; i < view.Relics.Count; i++)
         {
             var bounds = RelicBounds(player, i);
             if (view.Relics[i] is { } relic)
@@ -334,8 +334,8 @@ internal sealed partial class BoardUI
                 break;
             case DuelPhase.End:
                 DrawButton(AnchorBottomLeft(DiscardButton), "Discard",
-                    selectedHand is not null && humanView.HandCount > Duel.HandLimit);
-                DrawButton(AnchorBottomRight(NextButton), "End turn", humanView.HandCount <= Duel.HandLimit);
+                    selectedHand is not null && humanView.HandCount > duel.Format.HandLimit);
+                DrawButton(AnchorBottomRight(NextButton), "End turn", humanView.HandCount <= duel.Format.HandLimit);
                 break;
         }
         if (selectedAttacker is not null || selectedHand is not null)
@@ -406,6 +406,7 @@ internal sealed partial class BoardUI
     {
         FillRoundedRectangle(bounds, Recess);
         DrawDashedBorder(bounds, new Color(72, 104, 112));
-        DrawCenteredText(label, bounds.Center.X, bounds.Center.Y - 9, 16, Muted);
+        var fontHeight = Math.Min(16, 2 * (bounds.Width - 6) / label.Length);
+        DrawCenteredText(label, bounds.Center.X, bounds.Center.Y - fontHeight / 2 - 1, fontHeight, Muted);
     }
 }

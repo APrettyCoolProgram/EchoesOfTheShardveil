@@ -15,16 +15,16 @@ public sealed class Duel
     /// <summary>The default required deck size.</summary>
     public const int DeckSize = 40;
 
-    /// <summary>The number of cards dealt to each player before the mulligan.</summary>
+    /// <summary>The default number of cards dealt before the mulligan.</summary>
     public const int OpeningHandSize = 5;
 
-    /// <summary>The most cards a player can keep when their turn ends.</summary>
+    /// <summary>The default hand limit at the end of a turn.</summary>
     public const int HandLimit = 10;
 
-    /// <summary>The number of Unit slots on each side.</summary>
+    /// <summary>The default number of Unit slots on each side.</summary>
     public const int UnitSlots = 5;
 
-    /// <summary>The number of Relic slots on each side.</summary>
+    /// <summary>The default number of Relic slots on each side.</summary>
     public const int RelicSlots = 2;
 
     /// <summary>The most shards a Well can hold. No card or ability can cost more.</summary>
@@ -35,7 +35,6 @@ public sealed class Duel
 
     private static readonly DuelFormat DefaultFormat = new(StartingHealth, DeckSize, MaxCopiesPerName);
 
-    private readonly DuelFormat format;
     private readonly Player[] players;
     private readonly Random random;
     private readonly int firstPlayer;
@@ -57,24 +56,27 @@ public sealed class Duel
             throw new ArgumentException("A duel leader must have the Leader card type.");
         }
 
-        this.format = format ?? DefaultFormat;
+        Format = format ?? DefaultFormat;
         random = seed is int value ? new Random(value) : new Random();
         players =
         [
             new(playerOneLeader ?? new("leader-one", "Leader One") { Type = CardType.Leader },
-                ValidateDeck(playerOneDeck), this.format.StartingHealth),
+                ValidateDeck(playerOneDeck), Format),
             new(playerTwoLeader ?? new("leader-two", "Leader Two") { Type = CardType.Leader },
-                ValidateDeck(playerTwoDeck), this.format.StartingHealth),
+                ValidateDeck(playerTwoDeck), Format),
         ];
         firstPlayer = random.Next(players.Length);
         ActivePlayer = firstPlayer;
-        players[1 - firstPlayer].HasSpark = true;
+        players[1 - firstPlayer].HasSpark = Format.SecondPlayerGetsSpark;
         foreach (var player in players)
         {
             random.Shuffle(CollectionsMarshal.AsSpan(player.Deck));
-            Draw(player, OpeningHandSize);
+            Draw(player, Format.OpeningHandSize);
         }
     }
+
+    /// <summary>Gets the format used by this duel.</summary>
+    public DuelFormat Format { get; }
 
     /// <summary>Gets the step waiting to be resolved.</summary>
     public DuelPhase Phase { get; private set; } = DuelPhase.Mulligan;
@@ -174,7 +176,7 @@ public sealed class Duel
                 CheckOutcome();
                 break;
             case DuelPhase.End:
-                Require(owner.Hand.Count <= HandLimit, "Discard down to the hand limit first.");
+                Require(owner.Hand.Count <= Format.HandLimit, "Discard down to the hand limit first.");
                 owner.ReadyShards = 0;
                 owner.TemporaryEnergy = 0;
                 ActivePlayer = 1 - ActivePlayer;
@@ -196,7 +198,7 @@ public sealed class Duel
     public void DiscardToLimit(int player, int handSlot)
     {
         var owner = RequirePhase(player, DuelPhase.End);
-        Require(owner.Hand.Count > HandLimit, "The hand is within the limit.");
+        Require(owner.Hand.Count > Format.HandLimit, "The hand is within the limit.");
         owner.Discard.Add(GetHandCard(owner, handSlot));
         owner.Hand.RemoveAt(handSlot);
     }
@@ -268,7 +270,7 @@ public sealed class Duel
         var plays = new List<CardPlay>();
         for (var side = 0; side < players.Length; side++)
         {
-            for (var unit = 0; unit < UnitSlots; unit++)
+            for (var unit = 0; unit < players[side].Units.Length; unit++)
             {
                 var target = new UnitTarget(side, unit);
                 if (IsTargetLegal(player, abilities, target))
@@ -338,7 +340,7 @@ public sealed class Duel
     public void Activate(int player, bool relic, int slot, int abilityIndex, UnitTarget? target = null)
     {
         var owner = RequirePhase(player, DuelPhase.Main);
-        var card = relic ? (uint)slot < RelicSlots ? owner.Relics[slot] : null
+        var card = relic ? (uint)slot < owner.Relics.Length ? owner.Relics[slot] : null
             : GetUnit(new(player, slot))?.Card;
         Require(card is not null, "There is no card in that slot.");
         var abilities = card.Abilities;
@@ -521,7 +523,7 @@ public sealed class Duel
     {
         if (player.Health > 0)
         {
-            player.Health = (int)Math.Min(format.StartingHealth, (long)player.Health + amount);
+            player.Health = (int)Math.Min(Format.StartingHealth, (long)player.Health + amount);
         }
     }
 
@@ -743,7 +745,7 @@ public sealed class Duel
     /// <summary>Gets the Unit at an address.</summary>
     /// <param name="address">The side and slot.</param>
     /// <returns>The Unit, or <see langword="null"/> if the slot is empty or does not exist.</returns>
-    private Unit? GetUnit(UnitTarget address) => (uint)address.Slot < UnitSlots
+    private Unit? GetUnit(UnitTarget address) => (uint)address.Slot < Format.UnitSlots
         ? GetPlayer(address.Player).Units[address.Slot]
         : null;
 
@@ -787,12 +789,12 @@ public sealed class Duel
     private List<CardDefinition> ValidateDeck(IEnumerable<CardDefinition> deck)
     {
         var cards = deck.ToList();
-        if (cards.Count != format.DeckSize ||
+        if (cards.Count != Format.DeckSize ||
             cards.Any(card => !IsPlayableCard(card)) ||
             cards.GroupBy(card => card.Name, StringComparer.OrdinalIgnoreCase)
-                .Any(group => group.Count() > format.MaxCopiesPerName))
+                .Any(group => group.Count() > Format.MaxCopiesPerName))
         {
-            throw new ArgumentException($"A deck needs {format.DeckSize} valid playable cards, with at most {format.MaxCopiesPerName} of each name.",
+            throw new ArgumentException($"A deck needs {Format.DeckSize} valid playable cards, with at most {Format.MaxCopiesPerName} of each name.",
                 nameof(deck));
         }
         // Copy the ability lists so a caller cannot change the cards of a running duel.
@@ -814,8 +816,8 @@ public sealed class Duel
     /// <summary>The mutable state of one side of the duel.</summary>
     /// <param name="leader">The player's Leader card.</param>
     /// <param name="deck">The validated deck, with its top card last.</param>
-    /// <param name="startingHealth">The starting Health from the match format.</param>
-    private sealed class Player(CardDefinition leader, List<CardDefinition> deck, int startingHealth)
+    /// <param name="format">The match format used to initialize the side.</param>
+    private sealed class Player(CardDefinition leader, List<CardDefinition> deck, DuelFormat format)
     {
         /// <summary>Gets the player's Leader card.</summary>
         public CardDefinition Leader { get; } = leader;
@@ -833,13 +835,13 @@ public sealed class Duel
         public List<CardDefinition> Well { get; } = [];
 
         /// <summary>Gets the Unit slots.</summary>
-        public Unit?[] Units { get; } = new Unit?[UnitSlots];
+        public Unit?[] Units { get; } = new Unit?[format.UnitSlots];
 
         /// <summary>Gets the Relic slots.</summary>
-        public CardDefinition?[] Relics { get; } = new CardDefinition?[RelicSlots];
+        public CardDefinition?[] Relics { get; } = new CardDefinition?[format.RelicSlots];
 
         /// <summary>Gets or sets the remaining Health.</summary>
-        public int Health { get; set; } = startingHealth;
+        public int Health { get; set; } = format.StartingHealth;
 
         /// <summary>Gets or sets the shards not yet spent this turn.</summary>
         public int ReadyShards { get; set; }

@@ -51,7 +51,7 @@ internal static class SinglePlayerOpponent
                     return $"{own.Units[attacker]!.Card.Name} attacks your Hero.";
                 }
                 break;
-            case DuelPhase.End when hand.Count > Duel.HandLimit:
+            case DuelPhase.End when hand.Count > duel.Format.HandLimit:
                 duel.DiscardToLimit(Side, hand.Count - 1);
                 return "Opponent discarded to the hand limit.";
         }

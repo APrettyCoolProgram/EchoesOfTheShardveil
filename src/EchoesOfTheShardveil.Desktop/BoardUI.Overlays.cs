@@ -163,10 +163,13 @@ internal sealed partial class BoardUI
             var accent = side == 0 ? Rose : Teal;
             DrawText(side == 0 ? "OPPONENT" : "YOU", left + 11, y, 14, accent);
             FillRectangle(new(left + 12, y + 19, 19, 24), accent);
-            for (var slot = 0; slot < Duel.UnitSlots + Duel.RelicSlots; slot++)
+            var units = duel.Format.UnitSlots;
+            var slots = units + duel.Format.RelicSlots;
+            var step = Math.Min(15, 114 / Math.Max(1, slots));
+            for (var slot = 0; slot < slots; slot++)
             {
-                var x = left + 40 + slot * 15 + (slot >= Duel.UnitSlots ? 3 : 0);
-                FillRectangle(new(x, y + 23, 11, 16), slot < Duel.UnitSlots ? Border : Gold * 0.65f);
+                var x = left + 40 + slot * step + (slot >= units ? 3 : 0);
+                FillRectangle(new(x, y + 23, Math.Min(11, step - 1), 16), slot < units ? Border : Gold * 0.65f);
             }
         }
         DrawCenteredText("ACTIONS", left + width / 2, top + 159, 14, Muted);

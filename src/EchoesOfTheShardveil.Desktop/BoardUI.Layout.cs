@@ -23,6 +23,12 @@ internal sealed partial class BoardUI
     public const int BadgeSize = 36;
 
     private const int CardWidth = 95;
+    private const int UnitRowLeft = 265;
+    private const int RelicRowLeft = 1008;
+    private const int UnitRowWidth = RelicRowLeft - UnitRowLeft - 18;
+    private const int RelicRowWidth = Width - RelicRowLeft - 24;
+    private const int MinimumSlotWidth = 55;
+    private const int SlotGap = 6;
     // Card-shaped counters (Removed and Discard on the left, Deck on the right) flank the Hero portrait.
     // Both dimensions are odd so a digit with an odd size sits exactly in the middle (25 x 35 is 5:7 like a card).
     private const int CounterWidth = 25;
@@ -157,19 +163,47 @@ internal sealed partial class BoardUI
     private static Rectangle CardBounds(int x, int y, int width = CardWidth) =>
         new(x, y, width, width / 5 * 7);
 
+    /// <summary>Checks that the configured rows fit within the board's layout at a readable size.</summary>
+    /// <param name="format">The match format.</param>
+    public static void ValidateSlotLayout(DuelFormat format)
+    {
+        const int maxUnits = (UnitRowWidth + SlotGap) / (MinimumSlotWidth + SlotGap);
+        const int maxRelics = (RelicRowWidth + SlotGap) / (MinimumSlotWidth + SlotGap);
+        if (format.UnitSlots > maxUnits || format.RelicSlots > maxRelics)
+        {
+            throw new InvalidDataException($"The current board layout fits up to {maxUnits} Unit and {maxRelics} Relic slots per side.");
+        }
+    }
+
     /// <summary>Gets the position of a Unit slot.</summary>
     /// <param name="player">The player index.</param>
     /// <param name="slot">The Unit slot.</param>
     /// <returns>The slot bounds.</returns>
     private Rectangle UnitBounds(int player, int slot) =>
-        CardBounds(265 + slot * 150 + ExtraWidth * (slot + 1) / (Duel.UnitSlots + 1), SideTop(player));
+        SlotBounds(UnitRowLeft + ExtraWidth * (slot + 1) / (duel.Format.UnitSlots + 1),
+            SideTop(player), UnitRowWidth, 150, duel.Format.UnitSlots, slot);
 
     /// <summary>Gets the position of a Relic slot.</summary>
     /// <param name="player">The player index.</param>
     /// <param name="slot">The Relic slot.</param>
     /// <returns>The slot bounds.</returns>
     private Rectangle RelicBounds(int player, int slot) =>
-        CardBounds(1008 + slot * 131 + ExtraWidth, SideTop(player));
+        SlotBounds(RelicRowLeft + ExtraWidth, SideTop(player), RelicRowWidth, 131, duel.Format.RelicSlots, slot);
+
+    /// <summary>Fits cards into a row, preserving its preferred spacing when there is room.</summary>
+    /// <param name="left">The row's left edge.</param>
+    /// <param name="top">The row's top edge.</param>
+    /// <param name="width">The space available to the row.</param>
+    /// <param name="preferredStep">The usual distance between cards.</param>
+    /// <param name="count">The number of slots in the row.</param>
+    /// <param name="slot">The slot to position.</param>
+    /// <returns>The card bounds for that slot.</returns>
+    private static Rectangle SlotBounds(int left, int top, int width, int preferredStep, int count, int slot)
+    {
+        var cardWidth = Math.Min(CardWidth, (width - SlotGap * (count - 1)) / count / 5 * 5);
+        var step = Math.Min(preferredStep, (width - cardWidth) / Math.Max(1, count - 1));
+        return CardBounds(left + slot * step, top, cardWidth);
+    }
 
     /// <summary>Gets where a hand card rests: partly below the bottom edge, shrinking as the hand grows.</summary>
     /// <param name="slot">The hand slot.</param>
@@ -239,7 +273,7 @@ internal sealed partial class BoardUI
     /// <returns>The Unit slot, or -1.</returns>
     private int FindUnit(int player, Point position)
     {
-        for (var i = 0; i < Duel.UnitSlots; i++)
+        for (var i = 0; i < duel.Format.UnitSlots; i++)
         {
             if (UnitBounds(player, i).Contains(position))
             {

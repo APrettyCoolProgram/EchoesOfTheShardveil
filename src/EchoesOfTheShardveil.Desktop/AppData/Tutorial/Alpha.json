@@ -56,14 +56,14 @@
       "points": [
         "Each deck has {deckSize} cards, with up to {maxCopiesPerName} copies of a card by name. Each player draws {openingHandSize} cards.",
         "Click any cards you want to replace, then confirm. They go to the bottom of your deck in random order before you draw replacements.",
-        "A random player goes first and skips their first draw. The second player gets a Spark for one temporary energy."
+        "A random player goes first and skips their first draw. When the format grants a Spark, the second player can spend it for one temporary energy."
       ]
     },
     {
       "title": "Follow the turn",
       "points": [
         "Ready refills your Well and readies your exhausted Units. Then Draw gives you one card.",
-        "In Main, feed the Well, use your Spark, and play cards. In Battle, attack one Unit at a time or skip combat.",
+        "In Main, feed the Well, use Spark if available, and play cards. In Battle, attack one Unit at a time or skip combat.",
         "At End, discard to {handLimit} cards if needed. Temporary energy expires and the other player takes their turn."
       ]
     },
@@ -86,7 +86,7 @@
     {
       "title": "Use the action row",
       "points": [
-        "In Main, drag a card onto your portrait for energy or to a highlighted slot to play it. Use Spark adds 1 energy. Go to battle ends Main.",
+        "In Main, drag a card onto your portrait for energy or to a highlighted slot to play it. Use Spark adds 1 energy when available. Go to battle ends Main.",
         "During combat, click a Unit or the Opponent portrait to target it. Take the hit declines interception. End battle moves to End.",
         "Use Cancel selection to clear a card or target choice. At End, Discard if above the limit, then click End turn."
       ]

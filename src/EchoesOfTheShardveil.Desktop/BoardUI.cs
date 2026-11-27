@@ -410,7 +410,9 @@ internal sealed partial class BoardUI : IDisposable
         if (AnchorBottomRight(NextButton).Contains(position))
         {
             duel.Mulligan(Human, mulliganSlots);
-            message = duel.ActivePlayer == Human ? "You go first." : "You go second and receive a Spark.";
+            message = duel.ActivePlayer == Human ? "You go first."
+                : duel.Format.SecondPlayerGetsSpark ? "You go second and receive a Spark."
+                : "You go second.";
             mulliganSlots.Clear();
             CloseInspector();
             ResetHandLift();
@@ -469,12 +471,12 @@ internal sealed partial class BoardUI : IDisposable
                 break;
             case DuelPhase.End:
                 if (AnchorBottomLeft(DiscardButton).Contains(position) && selectedHand is { } discard &&
-                    humanView.HandCount > Duel.HandLimit)
+                    humanView.HandCount > duel.Format.HandLimit)
                 {
                     duel.DiscardToLimit(Human, discard);
                     ResetSelection();
                 }
-                if (AnchorBottomRight(NextButton).Contains(position) && humanView.HandCount <= Duel.HandLimit)
+                if (AnchorBottomRight(NextButton).Contains(position) && humanView.HandCount <= duel.Format.HandLimit)
                 {
                     EndStep();
                 }

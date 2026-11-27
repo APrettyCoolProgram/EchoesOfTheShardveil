@@ -31,6 +31,7 @@ internal sealed class BoardScreen : IScreen
         this.services = services;
         var device = services.Device;
         var match = MatchSetup.Current;
+        BoardUI.ValidateSlotLayout(MatchFormats.Active);
         controls = new WindowControls(services.Audio, isBoard: true);
         boardRasterizer = new RasterizerState { ScissorTestEnable = true };
         heroPortrait = LoadFramedPortrait(device, match.Player.Portrait);
