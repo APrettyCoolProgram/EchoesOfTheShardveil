@@ -12,6 +12,7 @@ internal static class CardRulesText
     private static readonly CardKeyword[] Keywords = Enum.GetValues<CardKeyword>()
         .Where(keyword => keyword != CardKeyword.None).ToArray();
     private static readonly Lazy<Dictionary<string, KeywordText>> Catalog = new(LoadKeywords);
+    private static readonly Lazy<AbilityTextCatalog> Abilities = new(LoadAbilities);
 
     /// <summary>Writes the full rules of a card for the inspector.</summary>
     /// <param name="card">The card to describe.</param>
@@ -36,12 +37,8 @@ internal static class CardRulesText
     }
 
     /// <summary>Writes the short text printed on a card face.</summary>
-    /// <remarks>
-    /// The wording is tailored to the starter cards and does not reflect every trigger or amount.
-    /// Use <see cref="Describe"/> for accurate rules.
-    /// </remarks>
     /// <param name="card">The card to summarize.</param>
-    /// <returns>The keywords, or a short note on the first ability, or an empty string.</returns>
+    /// <returns>The keyword names, or a short description of the card's effects.</returns>
     public static string Summarize(CardDefinition card)
     {
         if (card.Keywords != CardKeyword.None)
@@ -49,21 +46,9 @@ internal static class CardRulesText
             return string.Join(", ", Keywords.Where(card.HasKeyword)
                 .Select(keyword => Catalog.Value[keyword.ToString()].Name));
         }
-        if (card.Abilities.Count == 0)
-        {
-            return "";
-        }
 
-        var ability = card.Abilities[0];
-        return ability.Action switch
-        {
-            AbilityAction.Damage => $"Deal {ability.Amount} damage",
-            AbilityAction.HealLeader => $"Arrival: heal {ability.Amount}",
-            AbilityAction.Draw => "Last Breath: draw",
-            AbilityAction.Ready => "Ready a unit; draw",
-            AbilityAction.IncreasePower => "Start: +1 Power",
-            _ => "",
-        };
+        return string.Join(" / ", card.Abilities.Select(ability =>
+            ExpandAbilityText(Abilities.Value.Actions[ability.Action].ShortText, ability)));
     }
 
     /// <summary>Reads the display catalog and checks that every engine keyword has an entry.</summary>
@@ -93,32 +78,59 @@ internal static class CardRulesText
     /// <returns>One line of rules text.</returns>
     private static string AbilityRule(CardAbility ability)
     {
-        var trigger = ability.Trigger switch
-        {
-            AbilityTrigger.Arrival => "Arrival",
-            AbilityTrigger.LastBreath => "Last Breath",
-            AbilityTrigger.StartTurn => "Start of your turn",
-            AbilityTrigger.EndTurn => "End of your turn",
-            AbilityTrigger.Activated => $"Activate for {ability.Cost} energy",
-            _ => "On play",
-        };
-        var target = ability.Target switch
-        {
-            AbilityTarget.ChosenUnit => "a chosen Unit",
-            AbilityTarget.FriendlyUnit => "a friendly Unit",
-            AbilityTarget.RandomFriendlyUnit => "a random friendly Unit",
-            _ => "your Hero",
-        };
-        var amount = ability.Amount;
-        var action = ability.Action switch
-        {
-            AbilityAction.Damage => $"Deal {amount} damage to {target}.",
-            AbilityAction.HealLeader => $"Restore {amount} Health to your Hero, up to {MatchFormats.Alpha.StartingHealth}.",
-            AbilityAction.Draw => amount == 1 ? "Draw a card." : $"Draw {amount} cards.",
-            AbilityAction.Ready => $"Ready {target}.",
-            AbilityAction.IncreasePower => $"Give {target} +{amount} Power permanently.",
-            _ => "",
-        };
-        return $"{trigger} - {action}";
+        var catalog = Abilities.Value;
+        var trigger = ExpandAbilityText(catalog.Triggers[ability.Trigger], ability);
+        var action = catalog.Actions[ability.Action];
+        var template = ability.Amount == 1
+            ? action.SingularReminderText ?? action.ReminderText
+            : action.ReminderText;
+        return $"{trigger} - {ExpandAbilityText(template, ability)}";
     }
+
+    /// <summary>Replaces the supported tokens in an ability display template.</summary>
+    /// <param name="template">The text from the ability catalog.</param>
+    /// <param name="ability">The ability whose values are shown.</param>
+    /// <returns>The formatted text.</returns>
+    private static string ExpandAbilityText(string template, CardAbility ability) =>
+        template.Replace("{amount}", ability.Amount.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("{cost}", ability.Cost.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("{target}", Abilities.Value.Targets[ability.Target], StringComparison.Ordinal)
+            .Replace("{startingHealth}", MatchFormats.Alpha.StartingHealth.ToString(CultureInfo.InvariantCulture),
+                StringComparison.Ordinal);
+
+    /// <summary>Reads ability display text and verifies that each engine identifier has a label or template.</summary>
+    /// <returns>The complete ability catalog.</returns>
+    private static AbilityTextCatalog LoadAbilities()
+    {
+        var path = AppDataJson.PathFor("Rule", "Ability.json");
+        var catalog = AppDataJson.Load<AbilityTextCatalog>(path);
+        if (catalog.Triggers is null || catalog.Targets is null || catalog.Actions is null ||
+            Enum.GetValues<AbilityTrigger>().Any(trigger =>
+                !catalog.Triggers.TryGetValue(trigger, out var text) || string.IsNullOrWhiteSpace(text)) ||
+            Enum.GetValues<AbilityTarget>().Any(target =>
+                !catalog.Targets.TryGetValue(target, out var text) || string.IsNullOrWhiteSpace(text)) ||
+            Enum.GetValues<AbilityAction>().Any(action =>
+                !catalog.Actions.TryGetValue(action, out var text) || text is null ||
+                string.IsNullOrWhiteSpace(text.ReminderText) || string.IsNullOrWhiteSpace(text.ShortText)))
+        {
+            throw new InvalidDataException($"'{path}' must provide display text for every ability trigger, target and action.");
+        }
+
+        return catalog;
+    }
+
+    /// <summary>The ability display text, indexed by engine identifiers.</summary>
+    /// <param name="Triggers">Labels for when an effect resolves.</param>
+    /// <param name="Targets">Phrases for what an effect applies to.</param>
+    /// <param name="Actions">Templates for what an effect does.</param>
+    private sealed record AbilityTextCatalog(
+        Dictionary<AbilityTrigger, string> Triggers,
+        Dictionary<AbilityTarget, string> Targets,
+        Dictionary<AbilityAction, AbilityActionText> Actions);
+
+    /// <summary>The full and condensed descriptions of an action.</summary>
+    /// <param name="ReminderText">The full description shown in the inspector.</param>
+    /// <param name="ShortText">The condensed description shown on a card face.</param>
+    /// <param name="SingularReminderText">Optional full description for an amount of one.</param>
+    private sealed record AbilityActionText(string ReminderText, string ShortText, string? SingularReminderText = null);
 }

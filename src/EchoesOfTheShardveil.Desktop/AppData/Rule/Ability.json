@@ -1,0 +1,39 @@
+{
+  "triggers": {
+    "Spell": "On play",
+    "Arrival": "Arrival",
+    "LastBreath": "Last Breath",
+    "StartTurn": "Start of your turn",
+    "EndTurn": "End of your turn",
+    "Activated": "Activate for {cost} energy"
+  },
+  "targets": {
+    "Controller": "your Hero",
+    "ChosenUnit": "a chosen Unit",
+    "FriendlyUnit": "a friendly Unit",
+    "RandomFriendlyUnit": "a random friendly Unit"
+  },
+  "actions": {
+    "Damage": {
+      "reminderText": "Deal {amount} damage to {target}.",
+      "shortText": "Deal {amount} damage"
+    },
+    "HealLeader": {
+      "reminderText": "Restore {amount} Health to {target}, up to {startingHealth}.",
+      "shortText": "Heal {amount}"
+    },
+    "Draw": {
+      "reminderText": "Draw {amount} cards.",
+      "singularReminderText": "Draw a card.",
+      "shortText": "Draw {amount}"
+    },
+    "Ready": {
+      "reminderText": "Ready {target}.",
+      "shortText": "Ready {target}"
+    },
+    "IncreasePower": {
+      "reminderText": "Give {target} +{amount} Power permanently.",
+      "shortText": "+{amount} Power"
+    }
+  }
+}
