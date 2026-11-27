@@ -16,6 +16,8 @@ internal sealed class DeckbuilderUI : IScreen
     private const int VisibleRows = 14;
     private static readonly Rectangle Back = new(28, 28, 140, 42);
     private static readonly Rectangle Collection = new(28, 94, 668, 574);
+    private static readonly Rectangle SetFilter = new(186, 107, 164, 29);
+    private static readonly Rectangle InDeckFilter = new(360, 107, 112, 29);
     private static readonly Rectangle PreviousCards = new(600, 107, 36, 29);
     private static readonly Rectangle NextCards = new(644, 107, 36, 29);
     private static readonly Rectangle Details = new(714, 94, 378, 408);
@@ -33,27 +35,33 @@ internal sealed class DeckbuilderUI : IScreen
     private readonly WindowControls controls;
     private readonly InputTracker input = new();
     private readonly IReadOnlyList<CardDefinition> starter = StarterDecks.Create();
-    private readonly CardDefinition[] cards;
+    private readonly (string Set, CardDefinition Card)[] cards;
     private readonly int[] copies;
+    private readonly string[] setNames;
+    private int[] filteredCards = [];
+    private bool inDeckOnly;
+    private int setFilterIndex = -1;
     private int[] activeCopies;
-    private int selected;
+    private int selected = -1;
     private int firstVisible;
     private Point? pointer;
     private string[] rules = [];
     private string status = "";
 
-    /// <summary>Builds an editable list from the player starter deck's set.</summary>
+    /// <summary>Builds an editable list from the player starter recipe's sets.</summary>
     /// <param name="services">Shared graphics and audio resources.</param>
     public DeckbuilderUI(GameServices services)
     {
         this.services = services;
         controls = new WindowControls(services.Audio, isBoard: false);
-        cards = StarterDecks.PlayerPool.OrderBy(card => card.Cost).ThenBy(card => card.Name).ToArray();
+        cards = StarterDecks.PlayerPool.OrderBy(entry => entry.Card.Cost).ThenBy(entry => entry.Card.Name)
+            .ThenBy(entry => entry.Set, StringComparer.Ordinal).ToArray();
         copies = new int[cards.Length];
+        setNames = cards.Select(entry => entry.Set).Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal).ToArray();
         ActiveDeck = starter;
         RestoreStarter();
         activeCopies = (int[])copies.Clone();
-        Select(0);
     }
 
     /// <inheritdoc />
@@ -62,8 +70,8 @@ internal sealed class DeckbuilderUI : IScreen
     /// <summary>Gets the deck to use when starting the next duel.</summary>
     public IReadOnlyList<CardDefinition> ActiveDeck { get; private set; }
 
-    private int MaximumOffset => Math.Max(0, cards.Length - VisibleRows);
-    private int VisibleEnd => Math.Min(firstVisible + VisibleRows, cards.Length);
+    private int MaximumOffset => Math.Max(0, filteredCards.Length - VisibleRows);
+    private int VisibleEnd => Math.Min(firstVisible + VisibleRows, filteredCards.Length);
     private int CardCount => copies.Sum();
     private bool CanApply => CardCount == MatchFormats.Active.DeckSize && !copies.SequenceEqual(activeCopies);
 
@@ -169,9 +177,19 @@ internal sealed class DeckbuilderUI : IScreen
         }
         else if (ApplyDeck.Contains(position) && CanApply)
         {
-            ActiveDeck = cards.SelectMany((card, index) => Enumerable.Repeat(card, copies[index])).ToArray();
+            ActiveDeck = cards.SelectMany((card, index) => Enumerable.Repeat(card.Card, copies[index])).ToArray();
             activeCopies = (int[])copies.Clone();
             status = "Deck ready for Single player.";
+        }
+        else if (setNames.Length > 1 && SetFilter.Contains(position))
+        {
+            CycleSetFilter();
+        }
+        else if (InDeckFilter.Contains(position))
+        {
+            inDeckOnly = !inDeckOnly;
+            firstVisible = 0;
+            RefreshCollection();
         }
         else if (PreviousCards.Contains(position))
         {
@@ -183,9 +201,10 @@ internal sealed class DeckbuilderUI : IScreen
         }
         else
         {
-            for (var index = firstVisible; index < VisibleEnd; index++)
+            for (var visibleIndex = firstVisible; visibleIndex < VisibleEnd; visibleIndex++)
             {
-                var row = Row(index - firstVisible);
+                var index = filteredCards[visibleIndex];
+                var row = Row(visibleIndex - firstVisible);
                 if (!row.Contains(position))
                 {
                     continue;
@@ -196,14 +215,44 @@ internal sealed class DeckbuilderUI : IScreen
                 {
                     copies[index]--;
                     status = "";
+                    if (inDeckOnly && copies[index] == 0)
+                    {
+                        RefreshCollection();
+                    }
                 }
-                if (AddButton(row).Contains(position) && CanAdd(index, CardCount))
+                else if (AddButton(row).Contains(position) && CanAdd(index, CardCount))
                 {
                     copies[index]++;
                     status = "";
                 }
                 break;
             }
+        }
+    }
+
+    /// <summary>Cycles through the available sets and the unfiltered collection.</summary>
+    private void CycleSetFilter()
+    {
+        setFilterIndex = setFilterIndex == setNames.Length - 1 ? -1 : setFilterIndex + 1;
+        firstVisible = 0;
+        RefreshCollection();
+    }
+
+    /// <summary>Applies the active filters and keeps the visible rows and selected card in range.</summary>
+    private void RefreshCollection()
+    {
+        filteredCards = Enumerable.Range(0, cards.Length)
+            .Where(index => (setFilterIndex < 0 || cards[index].Set == setNames[setFilterIndex]) &&
+                (!inDeckOnly || copies[index] > 0)).ToArray();
+        firstVisible = Math.Min(firstVisible, MaximumOffset);
+        if (filteredCards.Length == 0)
+        {
+            selected = -1;
+            rules = [];
+        }
+        else if (!filteredCards.Contains(selected))
+        {
+            Select(filteredCards[firstVisible]);
         }
     }
 
@@ -217,7 +266,7 @@ internal sealed class DeckbuilderUI : IScreen
     /// <returns>Whether another copy can be added.</returns>
     private bool CanAdd(int index, int count) =>
         count < MatchFormats.Active.DeckSize &&
-        copies.Where((_, other) => StringComparer.OrdinalIgnoreCase.Equals(cards[index].Name, cards[other].Name))
+        copies.Where((_, other) => StringComparer.OrdinalIgnoreCase.Equals(cards[index].Card.Name, cards[other].Card.Name))
             .Sum() < MatchFormats.Active.MaxCopiesPerName;
 
     /// <summary>Resets the draft to the original starter composition.</summary>
@@ -225,8 +274,9 @@ internal sealed class DeckbuilderUI : IScreen
     {
         for (var index = 0; index < cards.Length; index++)
         {
-            copies[index] = starter.Count(card => card.Id == cards[index].Id);
+            copies[index] = starter.Count(card => ReferenceEquals(card, cards[index].Card));
         }
+        RefreshCollection();
     }
 
     /// <summary>Shows a card and prepares its rules for the detail panel.</summary>
@@ -234,7 +284,7 @@ internal sealed class DeckbuilderUI : IScreen
     private void Select(int index)
     {
         selected = index;
-        rules = CardRulesText.Describe(cards[index]).SelectMany(rule => BitmapText.Wrap(rule, 37)).ToArray();
+        rules = CardRulesText.Describe(cards[index].Card).SelectMany(rule => BitmapText.Wrap(rule, 37)).ToArray();
     }
 
     /// <summary>Draws the card list and the copy controls for each card.</summary>
@@ -244,20 +294,32 @@ internal sealed class DeckbuilderUI : IScreen
         Text("Card pool", 48, 106, 29, UiColors.Ivory);
         Text("Cost", 49, 143, 17, Muted);
         Text("Name", 111, 143, 17, Muted);
-        Text("Type", 423, 143, 17, Muted);
+        Text("Type", 391, 143, 17, Muted);
+        Text("Set", 454, 143, 17, Muted);
         Text("Copies", 575, 143, 17, Muted);
+        if (setNames.Length > 1)
+        {
+            var label = setFilterIndex < 0 ? "All sets" : BitmapText.Wrap(setNames[setFilterIndex], 12, 1)[0];
+            Button(SetFilter, label + " >", true);
+        }
+        Button(InDeckFilter, "In deck", true, primary: inDeckOnly);
+        if (filteredCards.Length == 0)
+        {
+            Text("No cards from this view are in your deck.", 48, 176, 20, Muted);
+        }
         if (MaximumOffset > 0)
         {
-            Text($"{firstVisible + 1}-{VisibleEnd} of {cards.Length}", 439, 111, 18, Muted);
+            Text($"{firstVisible + 1}-{VisibleEnd} of {filteredCards.Length}", 483, 112, 16, Muted);
             Button(PreviousCards, "<", firstVisible > 0);
             Button(NextCards, ">", firstVisible < MaximumOffset);
         }
 
         var count = CardCount;
-        for (var index = firstVisible; index < VisibleEnd; index++)
+        for (var visibleIndex = firstVisible; visibleIndex < VisibleEnd; visibleIndex++)
         {
-            var row = Row(index - firstVisible);
-            var card = cards[index];
+            var index = filteredCards[visibleIndex];
+            var row = Row(visibleIndex - firstVisible);
+            var (set, card) = cards[index];
             Fill(row, index == selected ? Teal : new Color(29, 43, 51));
             if (index == selected)
             {
@@ -265,8 +327,9 @@ internal sealed class DeckbuilderUI : IScreen
             }
 
             Text($"{card.Cost}", 60, row.Top + 5, 22, Gold);
-            Text(card.Name, 111, row.Top + 5, 22, UiColors.Ivory);
-            Text(card.Type.ToString(), 423, row.Top + 6, 20, Muted);
+            Text(BitmapText.Wrap(card.Name, 24, 1)[0], 111, row.Top + 5, 22, UiColors.Ivory);
+            Text(card.Type.ToString(), 391, row.Top + 6, 20, Muted);
+            Text(BitmapText.Wrap(set, 9, 1)[0], 454, row.Top + 7, 17, Muted);
             Text($"{copies[index]}", 595, row.Top + 5, 22, UiColors.Ivory);
             Button(RemoveButton(row), "-", copies[index] > 0);
             Button(AddButton(row), "+", CanAdd(index, count));
@@ -276,11 +339,17 @@ internal sealed class DeckbuilderUI : IScreen
     /// <summary>Draws the selected card's stats and rules.</summary>
     private void DrawDetails()
     {
-        var card = cards[selected];
         Box(Details, Panel);
-        Text(card.Name, 734, 113, 29, UiColors.Ivory);
+        if (selected < 0)
+        {
+            return;
+        }
+
+        var (set, card) = cards[selected];
+        Text(BitmapText.Wrap(card.Name, 23, 1)[0], 734, 113, 29, UiColors.Ivory);
         var type = string.IsNullOrEmpty(card.Subtype) ? card.Type.ToString() : $"{card.Type} / {card.Subtype}";
-        Text(type, 734, 153, 21, Muted);
+        Text(BitmapText.Wrap(type, 33, 1)[0], 734, 153, 21, Muted);
+        Text(BitmapText.Wrap($"Set: {set}", 37, 1)[0], 734, 173, 18, Muted);
         Text($"{card.Cost} energy", 734, 193, 22, Gold);
         if (card.Type == CardType.Unit)
         {
