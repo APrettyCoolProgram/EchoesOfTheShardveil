@@ -1,3 +1,6 @@
+// 261127_code
+// 261127_documentation
+
 namespace EchoesOfTheShardveil.Core;
 
 /// <summary>Provides two legal, experimental decks for Alpha.02.</summary>

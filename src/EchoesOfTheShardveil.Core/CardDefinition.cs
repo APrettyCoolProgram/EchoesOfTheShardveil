@@ -1,3 +1,6 @@
+// 261127_code
+// 261127_documentation
+
 namespace EchoesOfTheShardveil.Core;
 
 /// <summary>Defines a card independently of its state in a duel.</summary>

@@ -5,7 +5,7 @@
 		}
 	],
 	"settings": {
-		"workbench.colorTheme": "Red",
+		"workbench.colorTheme": "Godot 4",
 		"files.autoSave": "onFocusChange"
 	}
 }

@@ -1,3 +1,6 @@
+// 261127_code
+// 261127_documentation
+
 using System.Globalization;
 using EchoesOfTheShardveil.Core;
 

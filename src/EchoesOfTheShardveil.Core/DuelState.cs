@@ -1,3 +1,6 @@
+// 261127_code
+// 261127_documentation
+
 namespace EchoesOfTheShardveil.Core;
 
 /// <summary>The step of a duel that is waiting to be resolved.</summary>
