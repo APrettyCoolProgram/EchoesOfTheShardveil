@@ -9,8 +9,7 @@ namespace EchoesOfTheShardveil.Desktop;
 /// <summary>Animates details in the four-world menu painting in its original pixel coordinates.</summary>
 internal sealed class FourWorldMuralEffects : IDisposable
 {
-    private static readonly Point[] Torches = [new(191, 263), new(321, 295)];
-    private static readonly Point[] Crows = [new(143, 82), new(278, 171), new(309, 176)];
+    private static readonly Vector2[] Torches = [new(189, 280), new(320, 307)];
     private static readonly Point[] Windows =
     [
         new(1005, 244), new(1080, 199), new(1154, 280), new(1167, 277),
@@ -18,10 +17,14 @@ internal sealed class FourWorldMuralEffects : IDisposable
         new(1521, 84), new(1535, 114), new(1556, 123), new(1627, 198),
         new(1505, 689), new(1560, 680), new(1616, 667), new(1647, 688)
     ];
-    private static readonly (Vector2 Start, Vector2 End)[] Necromancy =
+    private static readonly Vector2 LeftPalm = new(273, 531);
+    private static readonly Vector2 RightPalm = new(471, 521);
+    private static readonly (Vector2 Socket, Vector2 Mouth, Vector2 Palm)[] Necromancy =
     [
-        (new(272, 621), new(274, 526)), (new(261, 666), new(280, 535)),
-        (new(412, 709), new(471, 520)), (new(304, 732), new(280, 535))
+        (new(274, 619), new(273, 630), LeftPalm),
+        (new(263, 670), new(261, 680), LeftPalm),
+        (new(315, 733), new(317, 746), LeftPalm),
+        (new(412, 710), new(403, 725), RightPalm)
     ];
     private static readonly Point[] Bolt =
         [new(1199, 117), new(1185, 126), new(1180, 147), new(1173, 156), new(1183, 173),
@@ -32,7 +35,8 @@ internal sealed class FourWorldMuralEffects : IDisposable
     private readonly Texture2D glow;
     private readonly Texture2D mural;
     private readonly (Texture2D Texture, Rectangle Bounds, float Motion)[] cloth;
-    private readonly (Texture2D Texture, Rectangle Bounds)[] skeletons;
+    private readonly Texture2D groundFog;
+    private readonly Texture2D torchFlame;
 
     /// <summary>Samples soft-edged patches of cloth and hair from the painting for small, localized motion.</summary>
     /// <param name="batch">The menu sprite batch.</param>
@@ -47,21 +51,13 @@ internal sealed class FourWorldMuralEffects : IDisposable
         this.mural = mural;
         cloth =
         [
-            ClothPatch(new(0, 491, 145, 258), 5),
-            ClothPatch(new(138, 459, 63, 92), 4),
-            ClothPatch(new(320, 545, 68, 139), 5),
             ClothPatch(new(494, 410, 34, 158), 4),
-            ClothPatch(new(440, 605, 187, 178), 7),
             ClothPatch(new(968, 475, 120, 172), 7),
             ClothPatch(new(1191, 550, 162, 144), 8),
             ClothPatch(new(1218, 327, 112, 141), 7)
         ];
-        skeletons =
-        [
-            RisingSkeleton(new(238, 598, 71, 83)),
-            RisingSkeleton(new(278, 711, 53, 78)),
-            RisingSkeleton(new(378, 679, 80, 117))
-        ];
+        groundFog = EmbeddedAssets.LoadPremultipliedTexture(mural.GraphicsDevice, "MainUI-GroundFog.png");
+        torchFlame = EmbeddedAssets.LoadPremultipliedTexture(mural.GraphicsDevice, "MainUI-TorchFlame.png");
     }
 
     /// <summary>Creates a soft light sprite shared by all mural effects.</summary>
@@ -102,15 +98,8 @@ internal sealed class FourWorldMuralEffects : IDisposable
             }
         }
 
-        for (var i = 0; i < skeletons.Length; i++)
-        {
-            var (texture, bounds) = skeletons[i];
-            var rise = MathHelper.SmoothStep(0, 6, Fade(Phase(time * 0.26f + i * 0.31f)));
-            batch.Draw(texture, new Vector2(bounds.X, bounds.Y - rise), Color.White * (rise / 6f));
-        }
-
+        DrawTorchFlames(time);
         DrawAtmosphere(time);
-        DrawCrows(time);
         DrawWindows(time);
         batch.End();
 
@@ -122,11 +111,19 @@ internal sealed class FourWorldMuralEffects : IDisposable
 
     private void DrawAtmosphere(float time)
     {
-        for (var i = 0; i < 5; i++)
+        for (var i = 0; i < 4; i++)
         {
-            var age = Phase(time * 0.11f + i * 0.2f);
-            Bloom(new(35 + 350 * age, 816 + 25 * (i % 3)), new(184, 29),
-                new Color(178, 188, 205), 0.22f * Fade(age), -0.08f);
+            var age = Phase(time * (0.056f + i * 0.009f) + i * 0.25f);
+            var position = new Vector2(-32 + 382 * age, 807 + 19 * i);
+            var size = new Vector2(217 + 24 * i, 35 + 8 * i);
+            DrawFog(position, size, 0.51f * Fade(age), i);
+        }
+
+        for (var i = 0; i < 3; i++)
+        {
+            var age = Phase(time * (0.067f + i * 0.012f) + i / 3f);
+            var position = new Vector2(233 + 157 * age, 770 + i * 18);
+            DrawFog(position, new Vector2(165 + 29 * i, 29 + 9 * i), 0.62f * Fade(age), i);
         }
 
         for (var i = 0; i < 3; i++)
@@ -146,28 +143,11 @@ internal sealed class FourWorldMuralEffects : IDisposable
         }
     }
 
-    private void DrawCrows(float time)
+    private void DrawFog(Vector2 position, Vector2 size, float opacity, int layer)
     {
-        for (var i = 0; i < Crows.Length; i++)
-        {
-            var clock = (time + i * 1.96f) % (6.5f + i);
-            if (clock >= 0.62f)
-            {
-                continue;
-            }
-
-            var center = Crows[i].ToVector2();
-            var lift = MathF.Abs(MathF.Sin(clock * 19));
-            var length = (i == 0 ? 25 : 15) * lift;
-            var opacity = Fade(clock / 0.62f) * lift;
-            for (var feather = 0; feather < 5; feather++)
-            {
-                var angle = 3.25f + lift * 0.72f + feather * 0.14f;
-                batch.Draw(pixel, center + new Vector2(-2, -1), null,
-                    new Color(18, 21, 26) * opacity, angle, new Vector2(0, 0.5f),
-                    new Vector2(length * (1 - feather * 0.085f), 2.5f), SpriteEffects.None, 0);
-            }
-        }
+        var textureSize = new Vector2(groundFog.Width, groundFog.Height);
+        batch.Draw(groundFog, position, null, Color.White * opacity, -0.045f, textureSize / 2,
+            size / textureSize, layer % 2 == 0 ? SpriteEffects.None : SpriteEffects.FlipHorizontally, 0);
     }
 
     private void DrawWindows(float time)
@@ -185,16 +165,24 @@ internal sealed class FourWorldMuralEffects : IDisposable
     private void DrawLights(float time)
     {
         var amber = new Color(255, 127, 36);
-        foreach (var torch in Torches)
+        for (var i = 0; i < Torches.Length; i++)
         {
-            var flicker = 0.5f + 0.3f * MathF.Sin(time * 13 + torch.X) + 0.2f * MathF.Sin(time * 21);
-            Bloom(torch.ToVector2(), new(37, 69), amber, 0.18f + 0.29f * flicker);
+            var basePosition = Torches[i];
+            var clock = time + i * 1.73f;
+            Bloom(basePosition - new Vector2(0, 14), new(51, 76), amber, 0.12f + 0.26f * TorchFlicker(clock));
+            for (var spark = 0; spark < 6; spark++)
+            {
+                var age = Phase(clock * (0.92f + spark * 0.13f) + spark * 0.37f);
+                var point = new Vector2(basePosition.X + MathF.Sin(age * 5f + spark) * (3 + 9 * age),
+                    basePosition.Y - 10 - age * (37 + spark * 3));
+                Bloom(point, new(3, 5), Color.Gold, 0.78f * Fade(age) * (1 - age));
+            }
         }
 
         for (var i = 0; i < 24; i++)
         {
             var age = Phase(time * (0.59f + i % 4 * 0.14f) + i * 0.618f);
-            var locus = Vector2.Lerp(new(625, 329), new(759, 554), age);
+            var locus = Vector2.Lerp(new(625, 329), new(641, 470), age);
             locus.X += MathF.Sin(age * 12 + i * 7) * (4 + i % 9 * 4) * age;
             Bloom(locus, new(5 + i % 5, 11), i % 2 == 0 ? amber : Color.Yellow, 0.64f * Fade(age), -0.43f);
         }
@@ -232,27 +220,21 @@ internal sealed class FourWorldMuralEffects : IDisposable
         var blue = new Color(75, 154, 255);
         var gold = new Color(255, 206, 73);
         var purple = new Color(172, 91, 255);
-        var orb = new Vector2(78, 379);
-        for (var i = 0; i < 9; i++)
+        var orb = new Vector2(81, 379);
+        for (var i = 0; i < 8; i++)
         {
-            var angle = time * 3.5f + i * MathHelper.TwoPi / 9;
-            Bloom(orb + new Vector2(MathF.Cos(angle) * 23, MathF.Sin(angle) * 15),
-                new(13, 8), i % 2 == 0 ? blue : gold, 0.55f, angle);
+            var angle = time * 1.65f + i * MathHelper.TwoPi / 8;
+            var direction = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+            var reach = 35 + i % 3 * 8;
+            var tint = i % 2 == 0 ? blue : gold;
+            Bloom(orb + direction * (reach * 0.51f), new(reach, 9), tint, 0.76f, angle);
+            Bloom(orb + direction * (reach * 0.44f), new(reach * 0.61f, 3), Color.White, 0.49f, angle);
         }
 
-        var strength = 0.55f + 0.45f * MathF.Sin(time * 4.5f);
-        Bloom(new(292, 462), new(104 + 18 * strength, 98 + 18 * strength), blue, 0.23f + 0.31f * strength);
-        Bloom(new(292, 462), new(31, 32), Color.White, 0.31f + 0.42f * strength);
-
-        foreach (var (start, end) in Necromancy)
+        foreach (var (socket, mouth, palm) in Necromancy)
         {
-            for (var i = 0; i < 9; i++)
-            {
-                var age = Phase(time * 0.72f + i / 9f);
-                var point = Vector2.Lerp(start, end, age);
-                point.X += MathF.Sin(age * 14 + time * 2 + start.X) * Fade(age) * 14;
-                Bloom(point, new(13, 30), purple, 0.34f * Fade(age), 0.24f);
-            }
+            DrawWisp(socket, palm, purple, time, -1);
+            DrawWisp(mouth, palm, purple, time, 1);
         }
 
         for (var i = 0; i < 13; i++)
@@ -265,11 +247,55 @@ internal sealed class FourWorldMuralEffects : IDisposable
         }
     }
 
+    private void DrawTorchFlames(float time)
+    {
+        var textureSize = new Vector2(torchFlame.Width, torchFlame.Height);
+        var root = textureSize * new Vector2(0.5f, 0.92f);
+        for (var i = 0; i < Torches.Length; i++)
+        {
+            var clock = time + i * 1.73f;
+            var flicker = TorchFlicker(clock);
+            var size = new Vector2(20 + 4 * flicker, 31 + 17 * flicker);
+            var sway = 0.13f * MathF.Sin(clock * 9.1f) + 0.065f * MathF.Sin(clock * 17.6f);
+            batch.Draw(torchFlame, Torches[i], null, Color.White, sway, root,
+                size / textureSize, SpriteEffects.None, 0);
+
+            // The smaller tongues grow and fade independently of the flame's core.
+            for (var tongue = 0; tongue < 2; tongue++)
+            {
+                var age = Phase(clock * (2.2f + 0.48f * tongue) + 0.43f * tongue);
+                var side = tongue == 0 ? -1 : 1;
+                var position = Torches[i] + new Vector2(side * (1 + 3 * age), -11 * age);
+                var scale = size * new Vector2(0.45f, 0.42f + 0.41f * age) / textureSize;
+                batch.Draw(torchFlame, position, null, Color.White * (0.76f * Fade(age)),
+                    sway + side * (0.13f + 0.29f * age), root, scale,
+                    tongue == 0 ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0);
+            }
+        }
+    }
+
+    private void DrawWisp(Vector2 source, Vector2 palm, Color color, float time, int curl)
+    {
+        var delta = palm - source;
+        var normal = Vector2.Normalize(new Vector2(-delta.Y, delta.X));
+        const int wisps = 15;
+        for (var i = 0; i < wisps; i++)
+        {
+            var age = Phase(time * 0.68f + i / (float)wisps + source.X * 0.007f);
+            var wave = Fade(age) * (11 * curl + 8 * MathF.Sin(age * 10 - time * 3 + source.Y));
+            var point = source + delta * age + normal * wave;
+            var opacity = 0.43f * MathF.Sin(MathF.PI * (0.12f + 0.82f * age));
+            var angle = MathF.Atan2(delta.Y, delta.X);
+            Bloom(point, new(23, 8), color, opacity, angle);
+            Bloom(point, new(14, 2.5f), Color.Plum, opacity * 0.78f, angle);
+        }
+    }
+
+    private static float TorchFlicker(float clock) => 0.5f + 0.24f * MathF.Sin(clock * 15.7f)
+        + 0.16f * MathF.Sin(clock * 26.9f) + 0.1f * MathF.Sin(clock * 39.1f);
+
     private (Texture2D Texture, Rectangle Bounds, float Motion) ClothPatch(Rectangle bounds, float motion) =>
         (Sample(bounds), bounds, motion);
-
-    private (Texture2D Texture, Rectangle Bounds) RisingSkeleton(Rectangle bounds) =>
-        (Sample(bounds), bounds);
 
     private Texture2D Sample(Rectangle bounds)
     {
@@ -295,16 +321,14 @@ internal sealed class FourWorldMuralEffects : IDisposable
 
     private static float Fade(float phase) => MathF.Sin(MathF.PI * phase);
 
-    /// <summary>Releases the sampled animation textures.</summary>
+    /// <summary>Releases the animation textures owned by the mural.</summary>
     public void Dispose()
     {
         foreach (var (texture, _, _) in cloth)
         {
             texture.Dispose();
         }
-        foreach (var (texture, _) in skeletons)
-        {
-            texture.Dispose();
-        }
+        groundFog.Dispose();
+        torchFlame.Dispose();
     }
 }

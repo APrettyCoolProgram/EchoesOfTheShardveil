@@ -18,6 +18,8 @@
     <EmbeddedResource Include="Content/Board-Font.png" LogicalName="Board-Font.png" />
     <EmbeddedResource Include="Content/Counter-Digits.png" LogicalName="Counter-Digits.png" />
     <EmbeddedResource Include="Content/MainUI-FourWorlds.png" LogicalName="MainUI-FourWorlds.png" />
+    <EmbeddedResource Include="Content/MainUI-GroundFog.png" LogicalName="MainUI-GroundFog.png" />
+    <EmbeddedResource Include="Content/MainUI-TorchFlame.png" LogicalName="MainUI-TorchFlame.png" />
     <EmbeddedResource Include="Content/MainUI-Menu.png" LogicalName="MainUI-Menu.png" />
     <EmbeddedResource Include="Content/MainUI-Title.png" LogicalName="MainUI-Title.png" />
     <EmbeddedResource Include="Content/MainUI-Theme.wav" LogicalName="MainUI-Theme.wav" />
