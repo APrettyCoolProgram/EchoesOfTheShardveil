@@ -5,7 +5,7 @@ using EchoesOfTheShardveil.Core;
 
 namespace EchoesOfTheShardveil.Desktop;
 
-/// <summary>Plays one legal action for the Alpha.02 computer opponent.</summary>
+/// <summary>Plays one legal action for the computer opponent.</summary>
 internal static class SinglePlayerOpponent
 {
     /// <summary>The player index the computer controls.</summary>
@@ -16,8 +16,9 @@ internal static class SinglePlayerOpponent
 
     /// <summary>Takes the computer's next single action, so the player can follow along.</summary>
     /// <param name="duel">A duel waiting for the computer.</param>
+    /// <param name="profile">The computer opponent preferences.</param>
     /// <returns>A message describing the action, or an empty string when there is nothing worth showing.</returns>
-    public static string TakeStep(Duel duel)
+    public static string TakeStep(Duel duel, OpponentProfile profile)
     {
         var own = duel.View(Side, Side);
         var enemy = duel.View(HumanSide, Side);
@@ -32,13 +33,13 @@ internal static class SinglePlayerOpponent
         switch (duel.Phase)
         {
             case DuelPhase.Main:
-                if (own.CanFeedWell && hand.Count > 1)
+                if (own.CanFeedWell && hand.Count > profile.CardsToKeepWhenFeeding)
                 {
                     var shard = Enumerable.Range(0, hand.Count).MaxBy(slot => hand[slot].Cost);
                     duel.FeedWell(Side, shard);
                     return "Opponent fed the Well.";
                 }
-                if (TryPlayCard(duel, own, enemy) is { } played)
+                if (TryPlayCard(duel, own, enemy, profile) is { } played)
                 {
                     return $"Opponent played {played.Name}.";
                 }
@@ -64,38 +65,38 @@ internal static class SinglePlayerOpponent
     /// <param name="duel">The duel in the computer's Main phase.</param>
     /// <param name="own">The computer's side.</param>
     /// <param name="enemy">The human's side.</param>
+    /// <param name="profile">The computer opponent preferences.</param>
     /// <returns>The card played, or <see langword="null"/> if none could be.</returns>
-    private static CardDefinition? TryPlayCard(Duel duel, PlayerView own, PlayerView enemy)
+    private static CardDefinition? TryPlayCard(Duel duel, PlayerView own, PlayerView enemy, OpponentProfile profile)
     {
         var hand = own.Hand!;
         var energy = own.ReadyShards + own.TemporaryEnergy;
         foreach (var slot in Enumerable.Range(0, hand.Count).OrderByDescending(index => hand[index].Cost))
         {
             var card = hand[slot];
-            if (card.Cost > energy + (own.HasSpark ? duel.Format.SparkEnergy : 0)
-                || (card.Type == CardType.Unit && own.Units.All(unit => unit is not null))
-                || (card.Type == CardType.Relic && own.Relics.All(relic => relic is not null)))
+            var plays = duel.LegalPlays(Side, slot, includeSpark: profile.SpendSpark);
+            var friendly = RequiredTarget(card) == AbilityTarget.FriendlyUnit;
+            var preferred = friendly ? own : enemy;
+            var preferredSide = friendly ? Side : HumanSide;
+            var choices = plays.Where(play => play.Target is null || play.Target.Value.Player == preferredSide).ToArray();
+            if (choices.Length == 0)
             {
                 continue;
             }
 
-            UnitTarget? target = null;
-            if (RequiredTarget(card) is { } targetType)
-            {
-                var friendly = targetType == AbilityTarget.FriendlyUnit;
-                var selected = FindUnit(friendly ? own : enemy, _ => true);
-                if (selected < 0)
+            var choice = choices.MaxBy(play => play.Target is { } target && preferred.Units[target.Slot] is { } unit
+                ? profile.TargetPriority switch
                 {
-                    continue;
+                    OpponentTargetPriority.LowestHealth => -(unit.Card.Health - unit.Damage),
+                    OpponentTargetPriority.HighestPower => unit.Power,
+                    _ => 0,
                 }
-                target = new(friendly ? Side : HumanSide, selected);
-            }
-
+                : 0);
             if (card.Cost > energy)
             {
                 duel.UseSpark(Side);
             }
-            duel.Play(Side, slot, target);
+            duel.Play(Side, slot, choice.Target, choice.BoardSlot);
             return card;
         }
         return null;

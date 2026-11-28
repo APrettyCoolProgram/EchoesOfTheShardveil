@@ -148,8 +148,8 @@ internal sealed partial class BoardUI
         var portrait = PortraitBounds(player);
         return
         [
-            (RimBadge(portrait, 12), view.Shards, player == Human ? WellTooltip : OpponentWellTooltip),
-            (RimBadge(portrait, 6), view.Health, player == Human ? HealthTooltip : OpponentHealthTooltip),
+            (RimBadge(portrait, 12), view.Shards, player == Human ? boardHelp.Well : boardHelp.OpponentWell),
+            (RimBadge(portrait, 6), view.Health, player == Human ? boardHelp.Health : boardHelp.OpponentHealth),
         ];
     }
 
@@ -159,14 +159,14 @@ internal sealed partial class BoardUI
     /// <param name="portrait">The portrait the counters flank.</param>
     /// <param name="view">The player's snapshot.</param>
     /// <returns>Each counter's position, number and help.</returns>
-    private static (Rectangle Bounds, int Value, Tooltip Tooltip)[] CardCounters(Rectangle portrait, PlayerView view)
+    private (Rectangle Bounds, int Value, Tooltip Tooltip)[] CardCounters(Rectangle portrait, PlayerView view)
     {
         var bottom = portrait.Bottom - CounterHeight;
         return
         [
-            (new(CounterEdge, portrait.Top, CounterWidth, CounterHeight), 0, RemovedTooltip),
-            (new(CounterEdge, bottom, CounterWidth, CounterHeight), view.Discard.Count, DiscardTooltip),
-            (new(DeckCounterLeft, bottom, CounterWidth, CounterHeight), view.DeckCount, DeckTooltip),
+            (new(CounterEdge, portrait.Top, CounterWidth, CounterHeight), 0, boardHelp.Removed),
+            (new(CounterEdge, bottom, CounterWidth, CounterHeight), view.Discard.Count, boardHelp.Discard),
+            (new(DeckCounterLeft, bottom, CounterWidth, CounterHeight), view.DeckCount, boardHelp.Deck),
         ];
     }
 

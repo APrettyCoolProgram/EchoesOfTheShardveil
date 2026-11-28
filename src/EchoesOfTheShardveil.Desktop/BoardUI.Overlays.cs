@@ -14,21 +14,6 @@ internal sealed partial class BoardUI
     private static readonly Color OverlayFill = new(19, 34, 43);
     private static readonly Color OverlayEdge = new(73, 110, 120);
 
-    private static readonly Tooltip HealthTooltip =
-        new("HEALTH", "Your Hero's remaining Health. Units and effects reduce it, and you lose at 0.");
-    private static readonly Tooltip WellTooltip =
-        new("WELL", "Shards in your Well. Each one refills at the start of your turn and pays 1 energy. During Main, drag a card onto your portrait to add a shard when the Well can be fed.");
-    private static readonly Tooltip OpponentHealthTooltip =
-        new("OPPONENT", "Their remaining Health. Attack this portrait to reduce it.");
-    private static readonly Tooltip OpponentWellTooltip =
-        new("WELL", "Shards in the Opponent's Well. Each ready shard pays for 1 energy.");
-    private static readonly Tooltip DiscardTooltip =
-        new("DISCARD", "Cards in your discard pile: used Spells, destroyed Units, and cards discarded to the hand limit.");
-    private static readonly Tooltip DeckTooltip =
-        new("DECK", "Cards left in your deck. You lose if you must draw from an empty deck.");
-    private static readonly Tooltip RemovedTooltip =
-        new("REMOVED", "Cards removed from the game. They can't return. No cards use this yet.");
-
     /// <summary>Draws help for the badge or counter under the pointer.</summary>
     private void DrawBadgeTooltip()
     {
@@ -51,9 +36,11 @@ internal sealed partial class BoardUI
         var (badge, _, (heading, body)) = hovered[0];
         var deck = counters[2].Bounds;
 
-        var lines = BitmapText.Wrap(body, 34);
         const int padding = 12;
         const int bodySize = 16;
+        var maxLines = Math.Max(1, (layoutHeight - 2 * padding - 36) / (bodySize + 4));
+        var lines = BitmapText.Wrap(body, 34, maxLines);
+        heading = BitmapText.Wrap(heading, 34, 1)[0];
         var width = 2 * padding + BitmapText.Advance(bodySize) * Math.Max(heading.Length, lines.Max(line => line.Length));
         var height = 2 * padding + 20 + lines.Length * (bodySize + 4);
         // Show it beside the portrait, level with the badge, so it never covers the portrait.
@@ -214,8 +201,4 @@ internal sealed partial class BoardUI
         }
     }
 
-    /// <summary>The help shown when hovering over a badge or counter.</summary>
-    /// <param name="Heading">The short title.</param>
-    /// <param name="Body">The explanation.</param>
-    private sealed record Tooltip(string Heading, string Body);
 }

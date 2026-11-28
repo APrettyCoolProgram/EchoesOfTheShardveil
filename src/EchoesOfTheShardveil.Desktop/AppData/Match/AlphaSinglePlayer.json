@@ -1,5 +1,6 @@
 {
   "format": "Rule/AlphaFormat.json",
+  "opponentProfile": "Opponent/Alpha.json",
   "tutorial": "Tutorial/Alpha.json",
   "player": {
     "deck": "Deck/AlphaPlayer.json",

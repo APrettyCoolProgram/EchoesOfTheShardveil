@@ -34,6 +34,7 @@ internal sealed class BoardScreen : IScreen
         this.draftPlaytest = draftPlaytest;
         var device = services.Device;
         var match = MatchSetup.Current;
+        var help = BoardHelp.Current;
         BoardUI.ValidateSlotLayout(MatchFormats.Active);
         controls = new WindowControls(services.Audio, isBoard: true,
             returnDestination: draftPlaytest ? "the deckbuilder" : null);
@@ -47,7 +48,7 @@ internal sealed class BoardScreen : IScreen
         blankBadge = CircleTexture.Create(device, BoardUI.BadgeSize, borderWidth: 1, Color.Black);
         using var digitSheet = EmbeddedAssets.LoadTexture(device, "Counter-Digits.png");
         board = new BoardUI(services.SpriteBatch, services.Pixel, services.Font, heroPortrait, healthAtlas,
-            heroDropRing, blankBadge, digitSheet, heroPlaymat, opponentPortrait, opponentPlaymat, playerDeck, draftPlaytest);
+            heroDropRing, blankBadge, digitSheet, heroPlaymat, opponentPortrait, opponentPlaymat, help, playerDeck, draftPlaytest);
     }
 
     /// <inheritdoc />

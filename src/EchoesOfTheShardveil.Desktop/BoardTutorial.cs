@@ -1,7 +1,6 @@
 // 261127_code
 // 261127_documentation
 
-using System.Globalization;
 using EchoesOfTheShardveil.Core;
 
 namespace EchoesOfTheShardveil.Desktop;
@@ -103,26 +102,9 @@ internal sealed class BoardTutorial
             throw new InvalidDataException($"'{path}' must provide complete tutorial prompt text.");
         }
 
-        var format = MatchFormats.Active;
-        var tokens = new (string Token, int Value)[]
-        {
-            ("{startingHealth}", format.StartingHealth),
-            ("{deckSize}", format.DeckSize),
-            ("{maxCopiesPerName}", format.MaxCopiesPerName),
-            ("{openingHandSize}", format.OpeningHandSize),
-            ("{unitSlots}", format.UnitSlots),
-            ("{relicSlots}", format.RelicSlots),
-            ("{handLimit}", format.HandLimit),
-            ("{wellLimit}", format.WellLimit),
-            ("{sparkEnergy}", format.SparkEnergy),
-            ("{cardsDrawnPerTurn}", format.CardsDrawnPerTurn),
-            ("{wellFeedsPerTurn}", format.WellFeedsPerTurn),
-            ("{maxMulliganSwaps}", format.MaxMulliganSwaps),
-        };
+        var formatText = new FormatText(MatchFormats.Active);
         var pages = tutorial.Pages.Select(page => new TutorialPage(page.Title,
-            page.Points.Select(point => tokens.Aggregate(point, (text, token) =>
-                text.Replace(token.Token, token.Value.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)))
-                .ToArray(),
+            page.Points.Select(formatText.Expand).ToArray(),
             page.Illustration, ResolveExample(page, tutorial, path))).ToArray();
         return new TutorialContent(pages, prompt);
     }

@@ -41,6 +41,8 @@ internal sealed partial class BoardUI : IDisposable
     private int inspectorScroll;
     private BoardTutorial tutorial;
     private readonly bool draftPlaytest;
+    private readonly BoardHelp boardHelp;
+    private readonly OpponentProfile opponentProfile = OpponentProfile.Current;
     private readonly IReadOnlyList<CardDefinition> playerDeck;
     private Duel duel;
     private PlayerView humanView;
@@ -64,14 +66,16 @@ internal sealed partial class BoardUI : IDisposable
     /// <param name="heroPlaymat">The background of the lower half.</param>
     /// <param name="opponentPortrait">The framed Opponent portrait.</param>
     /// <param name="opponentPlaymat">The background of the upper half.</param>
+    /// <param name="boardHelp">The resolved board tooltips.</param>
     /// <param name="playerDeck">The active player deck, or null to use the starter deck.</param>
     /// <param name="draftPlaytest">Whether this is a draft duel with a return to the deckbuilder.</param>
     public BoardUI(SpriteBatch spriteBatch, Texture2D pixel, Texture2D font,
         Texture2D heroPortrait, Texture2D healthAtlas, Texture2D heroDropRing, Texture2D blankBadge,
         Texture2D counterDigitSheet, Texture2D heroPlaymat, Texture2D opponentPortrait, Texture2D opponentPlaymat,
-        IReadOnlyList<CardDefinition>? playerDeck = null, bool draftPlaytest = false)
+        BoardHelp boardHelp, IReadOnlyList<CardDefinition>? playerDeck = null, bool draftPlaytest = false)
     {
         this.spriteBatch = spriteBatch;
+        this.boardHelp = boardHelp;
         this.pixel = pixel;
         this.font = font;
         this.heroPortrait = heroPortrait;
@@ -133,7 +137,7 @@ internal sealed partial class BoardUI : IDisposable
         }
 
         computerDelay = 0;
-        var update = SinglePlayerOpponent.TakeStep(duel);
+        var update = SinglePlayerOpponent.TakeStep(duel, opponentProfile);
         if (update.Length > 0)
         {
             message = update;

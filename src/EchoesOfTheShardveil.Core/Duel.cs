@@ -235,12 +235,13 @@ public sealed class Duel
     /// <summary>Lists available placements and targets without changing the duel.</summary>
     /// <param name="player">The index of the player.</param>
     /// <param name="handSlot">The zero-based hand slot of the card.</param>
+    /// <param name="includeSpark">Whether to include plays affordable by spending an available Spark first.</param>
     /// <returns>
-    /// Every way the card can be played now. The list is empty outside the player's Main phase, for an empty hand
+    /// Every way the card can be played with the allowed energy. The list is empty outside the player's Main phase, for an empty hand
     /// slot, or when the card cannot be paid for.
     /// </returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the index is not a player.</exception>
-    public IReadOnlyList<CardPlay> LegalPlays(int player, int handSlot)
+    public IReadOnlyList<CardPlay> LegalPlays(int player, int handSlot, bool includeSpark = false)
     {
         var owner = GetPlayer(player);
         if (Phase != DuelPhase.Main || player != ActivePlayer || (uint)handSlot >= owner.Hand.Count)
@@ -249,7 +250,7 @@ public sealed class Duel
         }
 
         var card = owner.Hand[handSlot];
-        if (card.Cost > owner.AvailableEnergy)
+        if (card.Cost > owner.AvailableEnergy + (includeSpark && owner.HasSpark ? Format.SparkEnergy : 0))
         {
             return [];
         }

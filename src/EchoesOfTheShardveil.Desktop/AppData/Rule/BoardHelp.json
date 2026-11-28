@@ -1,0 +1,30 @@
+{
+  "health": {
+    "heading": "HEALTH",
+    "body": "Your Hero's remaining Health. Units and effects reduce it, and you lose at 0."
+  },
+  "well": {
+    "heading": "WELL",
+    "body": "Shards in your Well. Each one refills at the start of your turn and pays 1 energy. During Main, drag a card onto your portrait to add a shard when the Well can be fed. Your Well holds up to {wellLimit} shards."
+  },
+  "opponentHealth": {
+    "heading": "OPPONENT",
+    "body": "Their remaining Health. Attack this portrait to reduce it."
+  },
+  "opponentWell": {
+    "heading": "WELL",
+    "body": "Shards in the Opponent's Well. Each ready shard pays for 1 energy."
+  },
+  "discard": {
+    "heading": "DISCARD",
+    "body": "Cards in your discard pile: used Spells, destroyed Units, and cards discarded to the {handLimit}-card hand limit."
+  },
+  "deck": {
+    "heading": "DECK",
+    "body": "Cards left in your deck. You lose if you must draw from an empty deck."
+  },
+  "removed": {
+    "heading": "REMOVED",
+    "body": "Cards removed from the game. They can't return. No cards use this yet."
+  }
+}

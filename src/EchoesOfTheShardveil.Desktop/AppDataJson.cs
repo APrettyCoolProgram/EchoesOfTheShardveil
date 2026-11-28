@@ -15,11 +15,26 @@ internal static class AppDataJson
         Converters = { new JsonStringEnumConverter(allowIntegerValues: false) },
     };
 
+    // Fully extracted single-file builds can report the extraction cache as BaseDirectory.
+    // Their AppData is shipped beside the app host. With dotnet MyApp.dll it lives beside the DLL.
+    private static readonly string AppDataDirectory = Path.Combine(GetDeploymentDirectory(), "AppData");
+
+    /// <summary>Gets the directory from which the desktop app was deployed.</summary>
+    /// <returns>The app host directory, or the managed application's base directory under dotnet.</returns>
+    private static string GetDeploymentDirectory()
+    {
+        var executable = Environment.ProcessPath;
+        return executable is not null &&
+            !string.Equals(Path.GetFileNameWithoutExtension(executable), "dotnet", StringComparison.OrdinalIgnoreCase)
+            ? Path.GetDirectoryName(executable) ?? AppContext.BaseDirectory
+            : AppContext.BaseDirectory;
+    }
+
     /// <summary>Resolves a file in the deployed AppData directory.</summary>
     /// <param name="parts">The path segments relative to AppData.</param>
     /// <returns>The absolute path of the data file.</returns>
     public static string PathFor(params string[] parts) =>
-        Path.Combine([AppContext.BaseDirectory, "AppData", .. parts]);
+        Path.Combine([AppDataDirectory, .. parts]);
 
     /// <summary>Resolves an AppData-relative content reference from a configuration file.</summary>
     /// <param name="reference">A relative path using forward slashes.</param>

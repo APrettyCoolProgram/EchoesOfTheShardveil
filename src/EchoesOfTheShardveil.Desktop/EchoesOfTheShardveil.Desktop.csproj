@@ -17,8 +17,7 @@
     <EmbeddedResource Include="Content/Board-Opponent-Lich-King-Playmat.jpg" LogicalName="Board-Opponent-Lich-King-Playmat.jpg" />
     <EmbeddedResource Include="Content/Board-Font.png" LogicalName="Board-Font.png" />
     <EmbeddedResource Include="Content/Counter-Digits.png" LogicalName="Counter-Digits.png" />
-    <EmbeddedResource Include="Content/MainUI-Mural.png" LogicalName="MainUI-Mural.png" />
-    <EmbeddedResource Include="Content/MainUI-SideScenes.png" LogicalName="MainUI-SideScenes.png" />
+    <EmbeddedResource Include="Content/MainUI-FourWorlds.png" LogicalName="MainUI-FourWorlds.png" />
     <EmbeddedResource Include="Content/MainUI-Menu.png" LogicalName="MainUI-Menu.png" />
     <EmbeddedResource Include="Content/MainUI-Title.png" LogicalName="MainUI-Title.png" />
     <EmbeddedResource Include="Content/MainUI-Theme.wav" LogicalName="MainUI-Theme.wav" />
@@ -29,6 +28,9 @@
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest"
           ExcludeFromSingleFile="true" />
+    <None Update="AppData/Archive/Background-Alpha.png"
+          CopyToOutputDirectory="Never"
+          CopyToPublishDirectory="Never" />
   </ItemGroup>
 
   <PropertyGroup>

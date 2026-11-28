@@ -138,6 +138,23 @@ internal sealed class CardGame : Game
     /// <param name="transition">The requested change.</param>
     private void Apply(ScreenTransition transition)
     {
+        try
+        {
+            ApplyTransition(transition);
+        }
+        catch (Exception error) when (currentScreen is MenuScreen currentMenu &&
+            transition is ScreenTransition.OpenBoard or ScreenTransition.OpenDeckbuilder &&
+            error is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine(error);
+            currentMenu.ShowContentError(transition);
+        }
+    }
+
+    /// <summary>Creates, activates or closes the screens for a transition.</summary>
+    /// <param name="transition">The requested change.</param>
+    private void ApplyTransition(ScreenTransition transition)
+    {
         switch (transition)
         {
             case ScreenTransition.OpenBoard when services is not null:

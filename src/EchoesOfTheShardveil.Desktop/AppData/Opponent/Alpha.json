@@ -1,0 +1,5 @@
+{
+  "cardsToKeepWhenFeeding": 1,
+  "spendSpark": true,
+  "targetPriority": "FirstSlot"
+}

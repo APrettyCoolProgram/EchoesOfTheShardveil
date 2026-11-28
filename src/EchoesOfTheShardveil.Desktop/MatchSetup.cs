@@ -10,8 +10,9 @@ namespace EchoesOfTheShardveil.Desktop;
 /// <param name="Player">The player side's content.</param>
 /// <param name="Opponent">The opponent side's content.</param>
 /// <param name="Tutorial">The AppData path of the walkthrough, or null to skip it.</param>
+/// <param name="OpponentProfile">The optional AppData path for the computer opponent preferences.</param>
 internal sealed record MatchSetup(string Format, MatchSide Player, MatchSide Opponent,
-    string? Tutorial = "Tutorial/Alpha.json")
+    string? Tutorial = "Tutorial/Alpha.json", string? OpponentProfile = null)
 {
     private static readonly Lazy<MatchSetup> SinglePlayer = new(Load);
 
