@@ -298,7 +298,11 @@ internal sealed partial class BoardUI
     {
         if (duel.Outcome != DuelOutcome.Ongoing)
         {
-            DrawButton(AnchorBottomCenter(RematchButton), "Play again", true);
+            DrawButton(AnchorBottomCenter(RematchBounds), "Play again", true);
+            if (draftPlaytest)
+            {
+                DrawButton(AnchorBottomCenter(DraftReturnButton), "Back to deckbuilder", true);
+            }
             return;
         }
 

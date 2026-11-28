@@ -19,9 +19,10 @@ internal sealed class BoardTutorial
         "Learn the rules");
 
     /// <summary>Starts at the configured prompt or first lesson, if a guide is available.</summary>
-    public BoardTutorial()
+    /// <param name="showGuide">Whether walkthrough content is wanted for this duel.</param>
+    public BoardTutorial(bool showGuide = true)
     {
-        IsOpen = Content.Value is not null;
+        IsOpen = showGuide && Content.Value is not null;
         PageIndex = IsOpen && Prompt is null ? 0 : -1;
     }
 

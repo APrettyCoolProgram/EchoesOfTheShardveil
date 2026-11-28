@@ -52,4 +52,22 @@ internal static class AppDataJson
             throw new InvalidDataException($"Invalid JSON in '{path}': {error.Message}", error);
         }
     }
+
+    /// <summary>Reads one object from a larger AppData document.</summary>
+    /// <typeparam name="T">The object type.</typeparam>
+    /// <param name="element">The JSON element to read.</param>
+    /// <param name="path">The containing file path for diagnostics.</param>
+    /// <returns>The deserialized object.</returns>
+    public static T ReadElement<T>(JsonElement element, string path) where T : class
+    {
+        try
+        {
+            return element.Deserialize<T>(Options)
+                ?? throw new InvalidDataException($"'{path}' contains an empty object.");
+        }
+        catch (JsonException error)
+        {
+            throw new InvalidDataException($"Invalid JSON object in '{path}': {error.Message}", error);
+        }
+    }
 }

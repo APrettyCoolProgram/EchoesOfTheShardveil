@@ -11,6 +11,7 @@ internal sealed class CardGame : Game
 {
     private readonly GraphicsDeviceManager graphics;
     private readonly GameAudio audio = new();
+    private readonly Lazy<SavedDeck> savedDeck = new(() => new SavedDeck(SavedDeck.DefaultPath));
     private GameServices? services;
     private DesktopDrawable? drawable;
     private QuitWatcher? quitWatcher;
@@ -42,6 +43,8 @@ internal sealed class CardGame : Game
         drawable = new DesktopDrawable();
         quitWatcher = new QuitWatcher();
         menu = new MenuScreen(services);
+        Window.TextInput += HandleTextInput;
+        Window.KeyDown += HandleKeyDown;
         Show(menu);
         audio.Start();
     }
@@ -87,6 +90,8 @@ internal sealed class CardGame : Game
             {
                 board.Dispose();
             }
+            Window.TextInput -= HandleTextInput;
+            Window.KeyDown -= HandleKeyDown;
             deckbuilder?.Dispose();
             menu?.Dispose();
             audio.Dispose();
@@ -97,6 +102,28 @@ internal sealed class CardGame : Game
             drawable?.Dispose();
         }
         base.Dispose(disposing);
+    }
+
+    /// <summary>Routes window text input to the deckbuilder when it is active.</summary>
+    /// <param name="sender">The window receiving text.</param>
+    /// <param name="args">The entered character.</param>
+    private void HandleTextInput(object? sender, TextInputEventArgs args)
+    {
+        if (IsActive && currentScreen is DeckbuilderUI editor)
+        {
+            editor.EnterSearchText(args.Character);
+        }
+    }
+
+    /// <summary>Routes collection navigation keys to the active deckbuilder.</summary>
+    /// <param name="sender">The window receiving input.</param>
+    /// <param name="args">The pressed key.</param>
+    private void HandleKeyDown(object? sender, InputKeyEventArgs args)
+    {
+        if (IsActive && currentScreen is DeckbuilderUI editor)
+        {
+            editor.NavigateCollection(args.Key);
+        }
     }
 
     /// <summary>Activates a screen and applies its window title.</summary>
@@ -114,10 +141,18 @@ internal sealed class CardGame : Game
         switch (transition)
         {
             case ScreenTransition.OpenBoard when services is not null:
-                Show(new BoardScreen(services, deckbuilder?.ActiveDeck));
+                Show(new BoardScreen(services, savedDeck.Value.ActiveDeck));
+                break;
+            case ScreenTransition.PlayDraft when services is not null &&
+                deckbuilder?.CreatePlaytestDeck() is { } draft:
+                Show(new BoardScreen(services, draft, draftPlaytest: true));
                 break;
             case ScreenTransition.OpenDeckbuilder when services is not null:
-                deckbuilder ??= new DeckbuilderUI(services);
+                if (currentScreen is BoardScreen playtest)
+                {
+                    playtest.Dispose();
+                }
+                deckbuilder ??= new DeckbuilderUI(services, savedDeck.Value);
                 deckbuilder.Activate();
                 Show(deckbuilder);
                 break;

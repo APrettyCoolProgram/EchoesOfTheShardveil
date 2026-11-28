@@ -13,6 +13,8 @@ internal enum ScreenTransition
     None,
     /// <summary>Start a duel.</summary>
     OpenBoard,
+    /// <summary>Start a duel using the current unapplied draft.</summary>
+    PlayDraft,
     /// <summary>Open the deck editor.</summary>
     OpenDeckbuilder,
     /// <summary>Show the main menu again.</summary>

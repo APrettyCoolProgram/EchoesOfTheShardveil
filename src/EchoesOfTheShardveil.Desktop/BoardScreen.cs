@@ -11,6 +11,7 @@ namespace EchoesOfTheShardveil.Desktop;
 internal sealed class BoardScreen : IScreen
 {
     private readonly GameServices services;
+    private readonly bool draftPlaytest;
     private readonly WindowControls controls;
     private readonly Texture2D heroPortrait;
     private readonly Texture2D opponentPortrait;
@@ -26,13 +27,16 @@ internal sealed class BoardScreen : IScreen
     /// <summary>Loads the board artwork and starts a duel.</summary>
     /// <param name="services">The shared graphics and audio.</param>
     /// <param name="playerDeck">The active player deck, or null to use the starter deck.</param>
-    public BoardScreen(GameServices services, IReadOnlyList<CardDefinition>? playerDeck = null)
+    /// <param name="draftPlaytest">Whether to return to the deckbuilder after this duel.</param>
+    public BoardScreen(GameServices services, IReadOnlyList<CardDefinition>? playerDeck = null, bool draftPlaytest = false)
     {
         this.services = services;
+        this.draftPlaytest = draftPlaytest;
         var device = services.Device;
         var match = MatchSetup.Current;
         BoardUI.ValidateSlotLayout(MatchFormats.Active);
-        controls = new WindowControls(services.Audio, isBoard: true);
+        controls = new WindowControls(services.Audio, isBoard: true,
+            returnDestination: draftPlaytest ? "the deckbuilder" : null);
         boardRasterizer = new RasterizerState { ScissorTestEnable = true };
         heroPortrait = LoadFramedPortrait(device, match.Player.Portrait);
         heroPlaymat = LoadMatchTexture(device, match.Player.Playmat);
@@ -43,11 +47,12 @@ internal sealed class BoardScreen : IScreen
         blankBadge = CircleTexture.Create(device, BoardUI.BadgeSize, borderWidth: 1, Color.Black);
         using var digitSheet = EmbeddedAssets.LoadTexture(device, "Counter-Digits.png");
         board = new BoardUI(services.SpriteBatch, services.Pixel, services.Font, heroPortrait, healthAtlas,
-            heroDropRing, blankBadge, digitSheet, heroPlaymat, opponentPortrait, opponentPlaymat, playerDeck);
+            heroDropRing, blankBadge, digitSheet, heroPlaymat, opponentPortrait, opponentPlaymat, playerDeck, draftPlaytest);
     }
 
     /// <inheritdoc />
-    public string Title => "Echoes of the Shardveil - Single player";
+    public string Title => draftPlaytest ? "Echoes of the Shardveil - Draft playtest"
+        : "Echoes of the Shardveil - Single player";
 
     /// <inheritdoc />
     public ScreenTransition Update(GameTime gameTime, Rectangle client, bool isActive)
@@ -76,7 +81,7 @@ internal sealed class BoardScreen : IScreen
 
         if (action == WindowControlResult.ConfirmedExit)
         {
-            return ScreenTransition.ReturnToMenu;
+            return draftPlaytest ? ScreenTransition.OpenDeckbuilder : ScreenTransition.ReturnToMenu;
         }
         if (controls.IsConfirming)
         {
@@ -84,8 +89,7 @@ internal sealed class BoardScreen : IScreen
             return ScreenTransition.None;
         }
 
-        UpdateBoard(gameTime.ElapsedGameTime, frame, boardViewport, client, action);
-        return ScreenTransition.None;
+        return UpdateBoard(gameTime.ElapsedGameTime, frame, boardViewport, client, action);
     }
 
     /// <inheritdoc />
@@ -163,7 +167,8 @@ internal sealed class BoardScreen : IScreen
     /// <param name="boardViewport">The mapping for the current window.</param>
     /// <param name="client">The window's client size in mouse units.</param>
     /// <param name="action">What the window controls did with a click.</param>
-    private void UpdateBoard(TimeSpan elapsed, InputFrame frame, BoardViewport boardViewport, Rectangle client,
+    /// <returns>The transition requested by a finished playtest, if any.</returns>
+    private ScreenTransition UpdateBoard(TimeSpan elapsed, InputFrame frame, BoardViewport boardViewport, Rectangle client,
         WindowControlResult action)
     {
         Point? pointer = null;
@@ -172,6 +177,10 @@ internal sealed class BoardScreen : IScreen
             pointer = position;
             if (action == WindowControlResult.Ignored && frame.LeftPressed)
             {
+                if (board.IsDraftReturn(position))
+                {
+                    return ScreenTransition.OpenDeckbuilder;
+                }
                 board.PointerPressed(position);
             }
             if (frame.RightPressed)
@@ -188,5 +197,6 @@ internal sealed class BoardScreen : IScreen
             board.PointerReleased(pointer);
         }
         board.Update(elapsed, pointer);
+        return ScreenTransition.None;
     }
 }

@@ -46,6 +46,8 @@ internal sealed partial class BoardUI
 
     // Rectangles are in design coordinates. The Anchor methods move them when the window is larger.
     private static readonly Rectangle RematchButton = new(510, 502, 260, 40);
+    private static readonly Rectangle DraftRematchButton = new(375, 502, 250, 40);
+    private static readonly Rectangle DraftReturnButton = new(655, 502, 250, 40);
     private static readonly Rectangle SparkButton = new(328, 505, 124, 38);
     private static readonly Rectangle DiscardButton = new(460, 505, 125, 38);
     private static readonly Rectangle NextButton = new(1018, 505, 234, 38);
@@ -61,6 +63,14 @@ internal sealed partial class BoardUI
 
     private int layoutHeight = Height;
     private int layoutWidth = Width;
+
+    private Rectangle RematchBounds => draftPlaytest ? DraftRematchButton : RematchButton;
+
+    /// <summary>Checks whether a finished draft playtest's return button was clicked.</summary>
+    /// <param name="position">The pointer in board units.</param>
+    /// <returns>Whether to return directly to the deckbuilder.</returns>
+    public bool IsDraftReturn(Point position) => draftPlaytest && duel.Outcome != DuelOutcome.Ongoing &&
+        AnchorBottomCenter(DraftReturnButton).Contains(position);
 
     /// <summary>Gets how much taller the layout is than the design.</summary>
     private int ExtraHeight => layoutHeight - Height;

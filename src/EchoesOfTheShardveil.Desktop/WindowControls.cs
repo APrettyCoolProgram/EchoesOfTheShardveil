@@ -20,7 +20,8 @@ internal enum WindowControlResult
 /// <summary>Draws the upper-right controls and handles their modal exit confirmation.</summary>
 /// <param name="audio">The sound preference the speaker icon toggles.</param>
 /// <param name="isBoard">Whether leaving forfeits a duel rather than closing the application.</param>
-internal sealed class WindowControls(GameAudio audio, bool isBoard)
+/// <param name="returnDestination">The screen named in the forfeit prompt, or null for the main menu.</param>
+internal sealed class WindowControls(GameAudio audio, bool isBoard, string? returnDestination = null)
 {
     // Icon paths are authored in a 44-unit square and drawn at three quarters of that size.
     private const int IconDesignSize = 44;
@@ -134,7 +135,7 @@ internal sealed class WindowControls(GameAudio audio, bool isBoard)
             BitmapText.Draw(spriteBatch, font, isBoard ? "Forfeit the game?" : "Exit Echoes of the Shardveil?",
                 left, layout.Dialog.Top + 23, 32, UiColors.Ivory);
             BitmapText.Draw(spriteBatch, font,
-                isBoard ? "You will return to the main menu." : "The application will close.",
+                isBoard ? $"You will return to {returnDestination ?? "the main menu"}." : "The application will close.",
                 left, layout.Dialog.Top + 69, 19, new Color(177, 192, 196));
             DrawButton(spriteBatch, pixel, font, layout.Cancel, "Cancel", Panel);
             DrawButton(spriteBatch, pixel, font, layout.Confirm, isBoard ? "Forfeit & return" : "Exit",

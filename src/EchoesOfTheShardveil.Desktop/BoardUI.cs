@@ -39,7 +39,8 @@ internal sealed partial class BoardUI : IDisposable
     private CardDefinition? inspectedCard;
     private string[] inspectorRows = [];
     private int inspectorScroll;
-    private BoardTutorial tutorial = new();
+    private BoardTutorial tutorial;
+    private readonly bool draftPlaytest;
     private readonly IReadOnlyList<CardDefinition> playerDeck;
     private Duel duel;
     private PlayerView humanView;
@@ -64,10 +65,11 @@ internal sealed partial class BoardUI : IDisposable
     /// <param name="opponentPortrait">The framed Opponent portrait.</param>
     /// <param name="opponentPlaymat">The background of the upper half.</param>
     /// <param name="playerDeck">The active player deck, or null to use the starter deck.</param>
+    /// <param name="draftPlaytest">Whether this is a draft duel with a return to the deckbuilder.</param>
     public BoardUI(SpriteBatch spriteBatch, Texture2D pixel, Texture2D font,
         Texture2D heroPortrait, Texture2D healthAtlas, Texture2D heroDropRing, Texture2D blankBadge,
         Texture2D counterDigitSheet, Texture2D heroPlaymat, Texture2D opponentPortrait, Texture2D opponentPlaymat,
-        IReadOnlyList<CardDefinition>? playerDeck = null)
+        IReadOnlyList<CardDefinition>? playerDeck = null, bool draftPlaytest = false)
     {
         this.spriteBatch = spriteBatch;
         this.pixel = pixel;
@@ -81,6 +83,8 @@ internal sealed partial class BoardUI : IDisposable
         this.blankBadge = blankBadge;
         counterDigits = CounterDigits.Build(counterDigitSheet, CounterDigitHeight);
         this.playerDeck = playerDeck ?? StarterDecks.Create();
+        this.draftPlaytest = draftPlaytest;
+        tutorial = new BoardTutorial(showGuide: !draftPlaytest);
         duel = NewDuel();
         humanView = duel.View(Human, Human);
         opponentView = duel.View(Opponent, Human);
@@ -214,7 +218,7 @@ internal sealed partial class BoardUI : IDisposable
 
         if (duel.Outcome != DuelOutcome.Ongoing)
         {
-            if (AnchorBottomCenter(RematchButton).Contains(position))
+            if (AnchorBottomCenter(RematchBounds).Contains(position))
             {
                 Rematch();
             }
@@ -254,11 +258,11 @@ internal sealed partial class BoardUI : IDisposable
         return match;
     }
 
-    /// <summary>Starts over with a new duel and tutorial prompt.</summary>
+    /// <summary>Starts over with the same deck and walkthrough preference.</summary>
     private void Rematch()
     {
         duel = NewDuel();
-        tutorial = new BoardTutorial();
+        tutorial = new BoardTutorial(showGuide: !draftPlaytest);
         mulliganSlots.Clear();
         ResetSelection();
         ResetHandLift();
